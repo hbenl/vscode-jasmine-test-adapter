@@ -17,7 +17,7 @@
     "vscode": "^1.23.0"
   },
   "activationEvents": [
-    "onView:extension.test-explorer.tests"
+    "onView:test-explorer"
   ],
   "dependencies": {
     "fs-extra": "^6.0.0",
