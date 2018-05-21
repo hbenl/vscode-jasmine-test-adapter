@@ -87,6 +87,7 @@ export class JasmineAdapter implements TestAdapter {
 					require.resolve('./worker/runTests.js'),
 					[ configFile, testFile ],
 					{
+						cwd: this.workspaceFolder.uri.fsPath,
 						execArgv: []
 					}
 				);
