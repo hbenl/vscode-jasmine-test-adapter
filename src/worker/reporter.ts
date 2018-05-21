@@ -10,7 +10,7 @@ export class Reporter implements jasmine.CustomReporter {
 			type: 'suite',
 			suite: {
 				type: 'suite',
-				id: result.id,
+				id: result.fullName,
 				label: result.description,
 				children: []
 			},
@@ -24,7 +24,7 @@ export class Reporter implements jasmine.CustomReporter {
 
 		const event: TestSuiteEvent = {
 			type: 'suite',
-			suite: result.id,
+			suite: result.fullName,
 			state: 'completed'
 		};
 
@@ -37,7 +37,7 @@ export class Reporter implements jasmine.CustomReporter {
 			type: 'test',
 			test: {
 				type: 'test',
-				id: result.id,
+				id: result.fullName,
 				label: result.description
 			},
 			state: 'running'
@@ -53,7 +53,7 @@ export class Reporter implements jasmine.CustomReporter {
 
 		const event: TestEvent = {
 			type: 'test',
-			test: result.id,
+			test: result.fullName,
 			state
 		};
 
