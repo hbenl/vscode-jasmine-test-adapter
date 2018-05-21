@@ -122,7 +122,9 @@ export class JasmineAdapter implements TestAdapter {
 	}
 
 	cancel(): void {
-		throw new Error("Method not implemented.");
+		if (this.runningTestProcess) {
+			this.runningTestProcess.kill();
+		}
 	}
 
 	private getConfiguration(): vscode.WorkspaceConfiguration {
