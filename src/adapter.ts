@@ -37,6 +37,11 @@ export class JasmineAdapter implements TestAdapter {
 	async load(): Promise<TestSuiteInfo | undefined> {
 
 		const config = this.getConfiguration();
+		const configFile = this.getConfigFilePath(config);
+		let specDir = await this.getSpecDir(configFile);
+		if (!specDir.endsWith('/')) {
+			specDir += '/';
+		}
 		const testFiles = await this.lookupFiles(this.getConfigFilePath(config));
 
 		if (testFiles.length === 0) {
@@ -46,7 +51,7 @@ export class JasmineAdapter implements TestAdapter {
 		const testFileSuites = testFiles.map(file => <TestSuiteInfo>{
 			type: 'suite',
 			id: file,
-			label: file,
+			label: file.startsWith(specDir) ? file.substr(specDir.length) : file,
 			file: file,
 			children: [],
 			isFileSuite: true
@@ -182,6 +187,18 @@ export class JasmineAdapter implements TestAdapter {
 	private getConfigFilePath(adapterConfig: vscode.WorkspaceConfiguration): string {
 		const relativePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
 		return path.resolve(this.workspaceFolder.uri.fsPath, relativePath);
+	}
+
+	private async getSpecDir(configFilePath: string): Promise<string> {
+
+		let jasmineConfig: any;
+		try {
+			jasmineConfig = await fs.readJson(configFilePath);
+		} catch(e) {
+			return this.workspaceFolder.uri.fsPath;
+		}
+
+		return this.workspaceFolder.uri.fsPath + '/' + jasmineConfig.spec_dir;
 	}
 
 	private async lookupFiles(configFilePath: string): Promise<string[]> {
