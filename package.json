@@ -1,26 +1,43 @@
 {
   "name": "vscode-jasmine-test-adapter",
-  "description": "Jasmine test adapter for VS Code",
+  "displayName": "Jasmine Test Explorer",
+  "description": "Run your Jasmine tests in the Sidebar of Visual Studio Code",
+  "icon": "icon.png",
   "author": "Holger Benl <hbenl@evandor.de>",
   "publisher": "hbenl",
   "version": "0.1.0",
   "license": "MIT",
+  "homepage": "https://github.com/hbenl/vscode-jasmine-test-adapter",
   "repository": {
     "type": "git",
     "url": "https://github.com/hbenl/vscode-jasmine-test-adapter.git"
   },
+  "bugs": {
+    "url": "https://github.com/hbenl/vscode-jasmine-test-adapter/issues"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "jasmine",
+    "test",
+    "testing"
+  ],
   "main": "out/main.js",
   "scripts": {
-    "postinstall": "node ./node_modules/vscode/bin/install"
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "reinstall": "rimraf node_modules package-lock.json && npm install",
+    "clean": "rimraf out vscode-jasmine-test-adapter-*.vsix",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "rebuild": "npm run clean && npm run build",
+    "package": "vsce package",
+    "publish": "vsce publish"
   },
-  "engines": {
-    "vscode": "^1.23.0"
-  },
-  "activationEvents": [
-    "onView:test-explorer"
+  "extensionDependencies": [
+    "hbenl.vscode-test-explorer"
   ],
   "dependencies": {
-    "escape-string-regexp": "^1.0.5",
     "fs-extra": "^6.0.0",
     "jasmine": "^3.1.0",
     "tslib": "^1.9.0",
@@ -33,5 +50,25 @@
     "typescript": "^2.8.3",
     "vsce": "^1.40.0",
     "vscode": "^1.1.17"
+  },
+  "engines": {
+    "vscode": "^1.23.0"
+  },
+  "activationEvents": [
+    "onView:test-explorer"
+  ],
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Configuration for the Jasmine Test Explorer extension",
+      "properties": {
+        "jasmineExplorer.config": {
+          "description": "The location of the Jasmine config file (relative to the workspace folder)",
+          "type": "string",
+          "default": "spec/support/jasmine.json",
+          "scope": "resource"
+        }
+      }
+    }
   }
 }
