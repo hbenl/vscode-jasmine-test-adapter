@@ -64,15 +64,21 @@ export class JasmineAdapter implements TestAdapter {
 
 	async run(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
 
+		const config = this.getConfiguration();
+		const configFile = this.getConfigFilePath(config);
+
 		let tests: string[] | undefined;
 		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
 			tests = [];
 			this.collectTests(info, tests);
 		}
 
-		const config = this.getConfiguration();
-		const configFile = this.getConfigFilePath(config);
-		const testFiles = await this.lookupFiles(configFile);
+		let testFiles: string[];
+		if ((info.type === 'suite') && (info.id === 'root')) {
+			testFiles = await this.lookupFiles(configFile);
+		} else {
+			testFiles = [ info.file! ];
+		}
 
 		this.testStatesEmitter.fire(<TestSuiteEvent>{
 			type: 'suite',

@@ -4,6 +4,7 @@ export class Reporter implements jasmine.CustomReporter {
 
 	constructor(
 		private readonly sendMessage: (message: any) => void,
+		private readonly testFile: string,
 		private readonly testsToReport: string[] | undefined
 	) {}
 
@@ -15,6 +16,7 @@ export class Reporter implements jasmine.CustomReporter {
 				type: 'suite',
 				id: result.fullName,
 				label: result.description,
+				file: this.testFile,
 				children: []
 			},
 			state: 'running'
@@ -44,7 +46,8 @@ export class Reporter implements jasmine.CustomReporter {
 				test: {
 					type: 'test',
 					id: result.fullName,
-					label: result.description
+					label: result.description,
+					file: this.testFile
 				},
 				state: 'running'
 			};

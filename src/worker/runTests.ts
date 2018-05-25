@@ -14,6 +14,6 @@ if (process.argv.length > 4) {
 const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
 
 const _jasmine = new Jasmine({});
-jasmine.getEnv().addReporter(new Reporter(sendMessage, testsToRun));
+jasmine.getEnv().addReporter(new Reporter(sendMessage, testFile, testsToRun));
 _jasmine.loadConfigFile(configFile);
 _jasmine.execute([ testFile ], regExp);
