@@ -20,11 +20,14 @@
     "onView:test-explorer"
   ],
   "dependencies": {
+    "escape-string-regexp": "^1.0.5",
     "fs-extra": "^6.0.0",
     "jasmine": "^3.1.0",
-    "tslib": "^1.9.0"
+    "tslib": "^1.9.0",
+    "vscode-test-adapter-api": "^0.3.0"
   },
   "devDependencies": {
+    "@types/escape-string-regexp": "0.0.32",
     "@types/fs-extra": "^5.0.2",
     "@types/jasmine": "^2.8.7",
     "typescript": "^2.8.3",

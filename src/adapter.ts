@@ -48,7 +48,8 @@ export class JasmineAdapter implements TestAdapter {
 			id: file,
 			label: file,
 			file: file,
-			children: []
+			children: [],
+			isFileSuite: true
 		});
 
 		const rootSuite: TestSuiteInfo = {
@@ -61,7 +62,13 @@ export class JasmineAdapter implements TestAdapter {
 		return rootSuite;
 	}
 
-	async run(info: TestSuiteInfo | TestInfo): Promise<void> {
+	async run(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
+
+		let tests: string[] | undefined;
+		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
+			tests = [];
+			this.collectTests(info, tests);
+		}
 
 		const config = this.getConfiguration();
 		const configFile = this.getConfigFilePath(config);
@@ -83,9 +90,14 @@ export class JasmineAdapter implements TestAdapter {
 
 			await new Promise<void>((resolve) => {
 
+				const args = [ configFile, testFile ];
+				if (tests) {
+					args.push(JSON.stringify(tests));
+				}
+
 				this.runningTestProcess = fork(
 					require.resolve('./worker/runTests.js'),
-					[ configFile, testFile ],
+					args,
 					{
 						cwd: this.workspaceFolder.uri.fsPath,
 						execArgv: []
@@ -157,4 +169,18 @@ export class JasmineAdapter implements TestAdapter {
 
 		return testFiles;
 	}
+
+	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
+		if (info.type === 'suite') {
+			for (const child of info.children) {
+				this.collectTests(child, tests);
+			}
+		} else {
+			tests.push(info.id);
+		}
+	}
+}
+
+interface JasmineTestSuiteInfo extends TestSuiteInfo {
+	isFileSuite?: boolean;
 }

@@ -2,7 +2,10 @@ import { TestEvent, TestSuiteEvent } from 'vscode-test-adapter-api';
 
 export class Reporter implements jasmine.CustomReporter {
 
-	constructor(private readonly sendMessage: (message: any) => void) {}
+	constructor(
+		private readonly sendMessage: (message: any) => void,
+		private readonly testsToReport: string[] | undefined
+	) {}
 
 	suiteStarted(result: jasmine.CustomReporterResult): void {
 
@@ -33,30 +36,50 @@ export class Reporter implements jasmine.CustomReporter {
 
 	specStarted(result: jasmine.CustomReporterResult): void {
 
-		const event: TestEvent = {
-			type: 'test',
-			test: {
-				type: 'test',
-				id: result.fullName,
-				label: result.description
-			},
-			state: 'running'
-		};
+		if ((this.testsToReport === undefined) ||
+			(this.testsToReport.indexOf(result.fullName) >= 0)) {
 
-		this.sendMessage(event);
+			const event: TestEvent = {
+				type: 'test',
+				test: {
+					type: 'test',
+					id: result.fullName,
+					label: result.description
+				},
+				state: 'running'
+			};
+	
+			this.sendMessage(event);
+		}
 	}
 
 	specDone(result: jasmine.CustomReporterResult): void {
 
-		const failed = result.failedExpectations && (result.failedExpectations.length > 0);
-		const state = failed ? 'failed' : 'passed';
+		if ((this.testsToReport === undefined) ||
+			(this.testsToReport.indexOf(result.fullName) >= 0)) {
 
-		const event: TestEvent = {
-			type: 'test',
-			test: result.fullName,
-			state
-		};
+			const event: TestEvent = {
+				type: 'test',
+				test: result.fullName,
+				state: convertTestState(result.status)
+			};
 
-		this.sendMessage(event);
+			this.sendMessage(event);
+		}
+	}
+}
+
+function convertTestState(jasmineState: string | undefined): 'passed' | 'failed' | 'skipped' {
+
+	switch (jasmineState) {
+
+		case 'passed':
+		case 'failed':
+			return jasmineState;
+
+		case 'pending': // skipped in the source (e.g. using xit() instead of it())
+		case 'excluded': // skipped due to test run filter
+		default:
+			return 'skipped';
 	}
 }
