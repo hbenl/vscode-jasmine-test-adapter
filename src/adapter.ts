@@ -67,17 +67,17 @@ export class JasmineAdapter implements TestAdapter {
 		const config = this.getConfiguration();
 		const configFile = this.getConfigFilePath(config);
 
-		let tests: string[] | undefined;
-		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
-			tests = [];
-			this.collectTests(info, tests);
-		}
-
 		let testFiles: string[];
 		if ((info.type === 'suite') && (info.id === 'root')) {
 			testFiles = await this.lookupFiles(configFile);
 		} else {
 			testFiles = [ info.file! ];
+		}
+
+		let tests: string[] | undefined;
+		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
+			tests = [];
+			this.collectTests(info, tests);
 		}
 
 		this.testStatesEmitter.fire(<TestSuiteEvent>{
@@ -136,8 +136,37 @@ export class JasmineAdapter implements TestAdapter {
 		});
 	}
 
-	async debug(info: TestSuiteInfo | TestInfo): Promise<void> {
-		throw new Error("Method not implemented.");
+	async debug(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
+
+		const config = this.getConfiguration();
+		const configFile = this.getConfigFilePath(config);
+
+		if ((info.type === 'suite') && (info.id === 'root')) {
+			throw new Error("You can't debug the root suite");
+		}
+
+		const testFile = info.file!;
+
+		let tests: string[] | undefined;
+		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
+			tests = [];
+			this.collectTests(info, tests);
+		}
+
+		const args = [ configFile, testFile ];
+		if (tests) {
+			args.push(JSON.stringify(tests));
+		}
+
+		vscode.debug.startDebugging(this.workspaceFolder, {
+			name: 'Debug Jasmine Tests',
+			type: 'node',
+			request: 'launch',
+			program: require.resolve('./worker/runTests.js'),
+			args,
+			cwd: '${workspaceRoot}',
+			stopOnEntry: false
+		});
 	}
 
 	cancel(): void {
