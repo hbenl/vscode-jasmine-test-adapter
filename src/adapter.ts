@@ -38,10 +38,7 @@ export class JasmineAdapter implements TestAdapter {
 
 		const config = this.getConfiguration();
 		const configFile = this.getConfigFilePath(config);
-		let specDir = await this.getSpecDir(configFile);
-		if (!specDir.endsWith('/')) {
-			specDir += '/';
-		}
+		let specDir = await this.getSpecDir(configFile) + path.sep;
 		const testFiles = await this.lookupFiles(this.getConfigFilePath(config));
 
 		if (testFiles.length === 0) {
@@ -198,7 +195,7 @@ export class JasmineAdapter implements TestAdapter {
 			return this.workspaceFolder.uri.fsPath;
 		}
 
-		return this.workspaceFolder.uri.fsPath + '/' + jasmineConfig.spec_dir;
+		return path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir);
 	}
 
 	private async lookupFiles(configFilePath: string): Promise<string[]> {
@@ -212,7 +209,7 @@ export class JasmineAdapter implements TestAdapter {
 
 		const testFiles: string[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
-			const testFilesGlob = jasmineConfig.spec_dir + '/' + relativeGlob;
+			const testFilesGlob = jasmineConfig.spec_dir + path.sep + relativeGlob;
 			const relativePattern = new vscode.RelativePattern(this.workspaceFolder, testFilesGlob);
 			const fileUris = await vscode.workspace.findFiles(relativePattern);
 			const filePaths = fileUris.map(uri => uri.fsPath);
