@@ -38,6 +38,7 @@
     "hbenl.vscode-test-explorer"
   ],
   "dependencies": {
+    "escape-string-regexp": "^1.0.5",
     "fs-extra": "^6.0.0",
     "jasmine": "^3.1.0",
     "tslib": "^1.9.0",
