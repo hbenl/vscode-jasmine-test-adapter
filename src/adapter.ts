@@ -209,7 +209,7 @@ export class JasmineAdapter implements TestAdapter {
 
 		const testFiles: string[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
-			const testFilesGlob = jasmineConfig.spec_dir + path.sep + relativeGlob;
+			const testFilesGlob = jasmineConfig.spec_dir + '/' + relativeGlob;
 			const relativePattern = new vscode.RelativePattern(this.workspaceFolder, testFilesGlob);
 			const fileUris = await vscode.workspace.findFiles(relativePattern);
 			const filePaths = fileUris.map(uri => uri.fsPath);
