@@ -87,72 +87,36 @@ export class JasmineAdapter implements TestAdapter {
 		const config = this.getConfiguration();
 		const configFile = this.getConfigFilePath(config);
 
-		let testFiles: string[];
-		if ((info.type === 'suite') && (info.id === 'root')) {
-			testFiles = await this.lookupFiles(configFile);
-		} else {
-			testFiles = [ info.file! ];
-		}
-
 		let tests: string[] | undefined;
 		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
 			tests = [];
 			this.collectTests(info, tests);
 		}
 
-		this.testStatesEmitter.fire(<TestSuiteEvent>{
-			type: 'suite',
-			suite: 'root',
-			state: 'running'
-		});
+		await new Promise<void>((resolve) => {
 
-		for (const testFile of testFiles) {
+			const args = [ configFile ];
+			if (tests) {
+				args.push(JSON.stringify(tests));
+			}
 
-			this.testStatesEmitter.fire(<TestSuiteEvent>{
-				type: 'suite',
-				suite: testFile,
-				state: 'running'
-			});
-
-			await new Promise<void>((resolve) => {
-
-				const args = [ configFile, testFile ];
-				if (tests) {
-					args.push(JSON.stringify(tests));
+			this.runningTestProcess = fork(
+				require.resolve('./worker/runTests.js'),
+				args,
+				{
+					cwd: this.workspaceFolder.uri.fsPath,
+					execArgv: []
 				}
+			);
 
-				this.runningTestProcess = fork(
-					require.resolve('./worker/runTests.js'),
-					args,
-					{
-						cwd: this.workspaceFolder.uri.fsPath,
-						execArgv: []
-					}
-				);
-	
-				this.runningTestProcess.on('message', 
-					event => this.testStatesEmitter.fire(<TestSuiteEvent | TestEvent>event)
-				);
-	
-				this.runningTestProcess.on('exit', () => {
+			this.runningTestProcess.on('message', 
+				event => this.testStatesEmitter.fire(<TestEvent>event)
+			);
 
-					this.testStatesEmitter.fire(<TestSuiteEvent>{
-						type: 'suite',
-						suite: testFile,
-						state: 'completed'
-					});
-		
-					this.runningTestProcess = undefined;
-					resolve();
-				});
-	
+			this.runningTestProcess.on('exit', () => {
+				this.runningTestProcess = undefined;
+				resolve();
 			});
-		}
-
-		this.testStatesEmitter.fire(<TestSuiteEvent>{
-			type: 'suite',
-			suite: 'root',
-			state: 'completed'
 		});
 	}
 
@@ -161,19 +125,13 @@ export class JasmineAdapter implements TestAdapter {
 		const config = this.getConfiguration();
 		const configFile = this.getConfigFilePath(config);
 
-		if ((info.type === 'suite') && (info.id === 'root')) {
-			throw new Error("You can't debug the root suite");
-		}
-
-		const testFile = info.file!;
-
 		let tests: string[] | undefined;
 		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
 			tests = [];
 			this.collectTests(info, tests);
 		}
 
-		const args = [ configFile, testFile ];
+		const args = [ configFile ];
 		if (tests) {
 			args.push(JSON.stringify(tests));
 		}
