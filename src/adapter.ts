@@ -45,20 +45,38 @@ export class JasmineAdapter implements TestAdapter {
 			return undefined;
 		}
 
-		const testFileSuites = testFiles.map(file => <TestSuiteInfo>{
-			type: 'suite',
-			id: file,
-			label: file.startsWith(specDir) ? file.substr(specDir.length) : file,
-			file: file,
-			children: [],
-			isFileSuite: true
-		});
-
 		const rootSuite: TestSuiteInfo = {
 			type: 'suite',
 			id: 'root',
 			label: 'Jasmine',
-			children: testFileSuites
+			children: []
+		}
+
+		for (const testFile of testFiles) {
+
+			let testSuiteInfo = await new Promise<JasmineTestSuiteInfo>(resolve => {
+
+				const args = [ configFile, testFile ];
+				let received: TestSuiteInfo;
+
+				const childProcess = fork(
+					require.resolve('./worker/loadTests.js'),
+					args,
+					{
+						cwd: this.workspaceFolder.uri.fsPath,
+						execArgv: []
+					}
+				);
+
+				childProcess.on('message', msg => received = msg);
+
+				childProcess.on('exit', () => resolve(received));
+			});
+
+			testSuiteInfo.label = testFile.startsWith(specDir) ? testFile.substr(specDir.length) : testFile
+			testSuiteInfo.isFileSuite = true;
+
+			rootSuite.children.push(testSuiteInfo);
 		}
 
 		return rootSuite;

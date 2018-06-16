@@ -16,6 +16,7 @@
   },
   "include": [
     "src/main.ts",
+    "src/worker/loadTests.ts",
     "src/worker/runTests.ts"
   ]
 }
