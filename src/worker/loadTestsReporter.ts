@@ -1,9 +1,12 @@
+import * as fs from 'fs';
 import { TestSuiteInfo, TestInfo } from "vscode-test-adapter-api";
+import * as RegExpEscape from 'escape-string-regexp';
 
 export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	private readonly rootSuite: TestSuiteInfo;
 	private readonly suiteStack: TestSuiteInfo[];
+	private readonly fileContent: string;
 
 	private get currentSuite(): TestSuiteInfo {
 		return this.suiteStack[this.suiteStack.length - 1];
@@ -20,7 +23,10 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 			children: [],
 			file: testFile
 		};
+
 		this.suiteStack = [ this.rootSuite ];
+
+		this.fileContent = fs.readFileSync(testFile, 'utf8');
 	}
 
 	suiteStarted(result: jasmine.CustomReporterResult): void {
@@ -30,6 +36,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 			id: result.fullName,
 			label: result.description,
 			file: this.testFile,
+			line: this.findLineContaining(result.description),
 			children: []
 		};
 
@@ -47,7 +54,8 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 			type: 'test',
 			id: result.fullName,
 			label: result.description,
-			file: this.testFile
+			file: this.testFile,
+			line: this.findLineContaining(result.description)
 		}
 
 		this.currentSuite.children.push(test);
@@ -55,5 +63,13 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	jasmineDone(runDetails: jasmine.RunDetails): void {
 		this.done(this.rootSuite);
+	}
+
+	private findLineContaining(needle: string): number | undefined {
+
+		const index = this.fileContent.search(RegExpEscape(needle));
+		if (index < 0) return undefined;
+
+		return this.fileContent.substr(0, index).split('\n').length - 1;
 	}
 }
