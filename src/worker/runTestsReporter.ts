@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as RegExpEscape from 'escape-string-regexp';
 import { TestEvent, TestSuiteEvent } from 'vscode-test-adapter-api';
 
-export class Reporter implements jasmine.CustomReporter {
+export class RunTestsReporter implements jasmine.CustomReporter {
 
 	private readonly fileContent: string;
 
