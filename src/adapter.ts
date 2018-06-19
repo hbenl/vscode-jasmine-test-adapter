@@ -2,6 +2,7 @@ import * as path from 'path';
 import { ChildProcess, fork } from 'child_process';
 import * as fs from 'fs-extra';
 import * as vscode from 'vscode';
+import { Minimatch, IMinimatch } from 'minimatch';
 import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo } from 'vscode-test-adapter-api';
 
 export class JasmineAdapter implements TestAdapter {
@@ -9,6 +10,8 @@ export class JasmineAdapter implements TestAdapter {
 	private readonly testStatesEmitter = new vscode.EventEmitter<TestSuiteEvent | TestEvent>();
 	private readonly reloadEmitter = new vscode.EventEmitter<void>();
 	private readonly autorunEmitter = new vscode.EventEmitter<void>();
+
+	private config?: LoadedConfig;
 
 	private runningTestProcess: ChildProcess | undefined;
 
@@ -27,7 +30,32 @@ export class JasmineAdapter implements TestAdapter {
 	constructor(
 		public readonly workspaceFolder: vscode.WorkspaceFolder
 	) {
+
+		vscode.workspace.onDidChangeConfiguration(async configChange => {
+			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri)) {
+				this.config = undefined;
+				this.reloadEmitter.fire();
+			}
+		});
+
 		vscode.workspace.onDidSaveTextDocument((doc) => {
+			if (!this.config) return;
+
+			const filename = doc.uri.fsPath;
+
+			if (filename === this.config.configFilePath) {
+				this.config = undefined;
+				this.reloadEmitter.fire();
+				return;
+			}
+
+			for (const glob of this.config.testFileGlobs) {
+				if (glob.match(filename)) {
+					this.reloadEmitter.fire();
+					return;
+				}
+			}
+
 			if (doc.uri.fsPath.startsWith(this.workspaceFolder.uri.fsPath)) {
 				this.autorunEmitter.fire();
 			}
@@ -36,12 +64,13 @@ export class JasmineAdapter implements TestAdapter {
 
 	async load(): Promise<TestSuiteInfo | undefined> {
 
-		const config = this.getConfiguration();
-		const configFile = this.getConfigFilePath(config);
-		let specDir = await this.getSpecDir(configFile) + path.sep;
-		const testFiles = await this.lookupFiles(this.getConfigFilePath(config));
+		if (!this.config) {
+			this.config = await this.loadConfig();
+		}
+		const config = this.config;
+		if (!config) return undefined;
 
-		if (testFiles.length === 0) {
+		if (config.testFiles.length === 0) {
 			return undefined;
 		}
 
@@ -52,11 +81,11 @@ export class JasmineAdapter implements TestAdapter {
 			children: []
 		}
 
-		for (const testFile of testFiles) {
+		for (const testFile of config.testFiles) {
 
 			let testSuiteInfo = await new Promise<JasmineTestSuiteInfo>(resolve => {
 
-				const args = [ configFile, testFile ];
+				const args = [ config.configFilePath, testFile ];
 				let received: TestSuiteInfo;
 
 				const childProcess = fork(
@@ -73,7 +102,7 @@ export class JasmineAdapter implements TestAdapter {
 				childProcess.on('exit', () => resolve(received));
 			});
 
-			testSuiteInfo.label = testFile.startsWith(specDir) ? testFile.substr(specDir.length) : testFile
+			testSuiteInfo.label = testFile.startsWith(config.specDir) ? testFile.substr(config.specDir.length) : testFile
 			testSuiteInfo.isFileSuite = true;
 
 			rootSuite.children.push(testSuiteInfo);
@@ -84,8 +113,8 @@ export class JasmineAdapter implements TestAdapter {
 
 	async run(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
 
-		const config = this.getConfiguration();
-		const configFile = this.getConfigFilePath(config);
+		const config = this.config;
+		if (!config) return;
 
 		let tests: string[] | undefined;
 		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
@@ -95,7 +124,7 @@ export class JasmineAdapter implements TestAdapter {
 
 		await new Promise<void>((resolve) => {
 
-			const args = [ configFile ];
+			const args = [ config.configFilePath ];
 			if (tests) {
 				args.push(JSON.stringify(tests));
 			}
@@ -122,8 +151,7 @@ export class JasmineAdapter implements TestAdapter {
 
 	async debug(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
 
-		const config = this.getConfiguration();
-		const configFile = this.getConfigFilePath(config);
+		if (!this.config) return;
 
 		let tests: string[] | undefined;
 		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
@@ -131,7 +159,7 @@ export class JasmineAdapter implements TestAdapter {
 			this.collectTests(info, tests);
 		}
 
-		const args = [ configFile ];
+		const args = [ this.config.configFilePath ];
 		if (tests) {
 			args.push(JSON.stringify(tests));
 		}
@@ -153,46 +181,36 @@ export class JasmineAdapter implements TestAdapter {
 		}
 	}
 
-	private getConfiguration(): vscode.WorkspaceConfiguration {
-		return vscode.workspace.getConfiguration('jasmineExplorer', this.workspaceFolder.uri);
-	}
+	private async loadConfig(): Promise<LoadedConfig | undefined> {
 
-	private getConfigFilePath(adapterConfig: vscode.WorkspaceConfiguration): string {
-		const relativePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
-		return path.resolve(this.workspaceFolder.uri.fsPath, relativePath);
-	}
-
-	private async getSpecDir(configFilePath: string): Promise<string> {
+		const adapterConfig = vscode.workspace.getConfiguration('jasmineExplorer', this.workspaceFolder.uri);
+		const relativeConfigFilePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
+		const configFilePath = path.resolve(this.workspaceFolder.uri.fsPath, relativeConfigFilePath);
 
 		let jasmineConfig: any;
 		try {
 			jasmineConfig = await fs.readJson(configFilePath);
 		} catch(e) {
-			return this.workspaceFolder.uri.fsPath;
+			return undefined;
 		}
 
-		return path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir);
-	}
+		const specDir = path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir);
 
-	private async lookupFiles(configFilePath: string): Promise<string[]> {
-
-		let jasmineConfig: any;
-		try {
-			jasmineConfig = await fs.readJson(configFilePath);
-		} catch(e) {
-			return [];
-		}
-
+		const testFileGlobs: IMinimatch[] = [];
 		const testFiles: string[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
-			const testFilesGlob = jasmineConfig.spec_dir + '/' + relativeGlob;
-			const relativePattern = new vscode.RelativePattern(this.workspaceFolder, testFilesGlob);
+
+			const absoluteGlob = path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir, relativeGlob);
+			testFileGlobs.push(new Minimatch(absoluteGlob));
+
+			const workspaceRelativeGlob = jasmineConfig.spec_dir + '/' + relativeGlob;
+			const relativePattern = new vscode.RelativePattern(this.workspaceFolder, workspaceRelativeGlob);
 			const fileUris = await vscode.workspace.findFiles(relativePattern);
-			const filePaths = fileUris.map(uri => uri.fsPath);
-			testFiles.push(...filePaths);
+			const files = fileUris.map(uri => uri.fsPath);
+			testFiles.push(...files);
 		}
 
-		return testFiles;
+		return { configFilePath, specDir, testFileGlobs, testFiles };
 	}
 
 	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
@@ -204,6 +222,13 @@ export class JasmineAdapter implements TestAdapter {
 			tests.push(info.id);
 		}
 	}
+}
+
+interface LoadedConfig {
+	configFilePath: string;
+	specDir: string;
+	testFileGlobs: IMinimatch[];
+	testFiles: string[];
 }
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {
