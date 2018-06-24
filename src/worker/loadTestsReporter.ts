@@ -62,6 +62,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 	}
 
 	jasmineDone(runDetails: jasmine.RunDetails): void {
+		this.sort(this.rootSuite);
 		this.done(this.rootSuite);
 	}
 
@@ -71,5 +72,22 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 		if (index < 0) return undefined;
 
 		return this.fileContent.substr(0, index).split('\n').length - 1;
+	}
+
+	private sort(suite: TestSuiteInfo): void {
+
+		suite.children.sort((a, b) => {
+			if ((a.line !== undefined) && (b.line !== undefined) && (a.line !== b.line)) {
+				return a.line - b.line;
+			} else {
+				return a.label.localeCompare(b.label);
+			}
+		});
+
+		for (const child of suite.children) {
+			if (child.type === 'suite') {
+				this.sort(child);
+			}
+		}
 	}
 }
