@@ -31,17 +31,17 @@ export class JasmineAdapter implements TestAdapter {
 		public readonly workspaceFolder: vscode.WorkspaceFolder
 	) {
 
-		vscode.workspace.onDidChangeConfiguration(async configChange => {
+		vscode.workspace.onDidChangeConfiguration(configChange => {
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri)) {
 				this.config = undefined;
 				this.reloadEmitter.fire();
 			}
 		});
 
-		vscode.workspace.onDidSaveTextDocument((doc) => {
+		vscode.workspace.onDidSaveTextDocument(document => {
 			if (!this.config) return;
 
-			const filename = doc.uri.fsPath;
+			const filename = document.uri.fsPath;
 
 			if (filename === this.config.configFilePath) {
 				this.config = undefined;
@@ -56,7 +56,7 @@ export class JasmineAdapter implements TestAdapter {
 				}
 			}
 
-			if (doc.uri.fsPath.startsWith(this.workspaceFolder.uri.fsPath)) {
+			if (filename.startsWith(this.workspaceFolder.uri.fsPath)) {
 				this.autorunEmitter.fire();
 			}
 		});
