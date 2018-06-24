@@ -84,10 +84,10 @@ export class JasmineAdapter implements TestAdapter {
 
 		for (const testFile of config.testFiles) {
 
-			let testSuiteInfo = await new Promise<JasmineTestSuiteInfo>(resolve => {
+			let testSuiteInfo = await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
 
 				const args = [ config.configFilePath, testFile ];
-				let received: TestSuiteInfo;
+				let received: TestSuiteInfo | undefined;
 
 				const childProcess = fork(
 					require.resolve('./worker/loadTests.js'),
@@ -104,13 +104,20 @@ export class JasmineAdapter implements TestAdapter {
 				childProcess.on('exit', () => resolve(received));
 			});
 
-			testSuiteInfo.label = testFile.startsWith(config.specDir) ? testFile.substr(config.specDir.length) : testFile
-			testSuiteInfo.isFileSuite = true;
+			if (testSuiteInfo !== undefined) {
 
-			rootSuite.children.push(testSuiteInfo);
+				testSuiteInfo.label = testFile.startsWith(config.specDir) ? testFile.substr(config.specDir.length) : testFile
+				testSuiteInfo.isFileSuite = true;
+
+				rootSuite.children.push(testSuiteInfo);
+			}
 		}
 
-		return rootSuite;
+		if (rootSuite.children.length > 0) {
+			return rootSuite;
+		} else {
+			return undefined;
+		}
 	}
 
 	async run(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
