@@ -27,10 +27,16 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 		if ((this.testsToReport === undefined) ||
 			(this.testsToReport.indexOf(result.fullName) >= 0)) {
 
+			let message: string | undefined;
+			if (result.failedExpectations) {
+				message = result.failedExpectations.map(failed => failed.stack).join('\n');
+			}
+
 			const event: TestEvent = {
 				type: 'test',
 				test: result.fullName,
-				state: convertTestState(result.status)
+				state: convertTestState(result.status),
+				message
 			};
 
 			this.sendMessage(event);
