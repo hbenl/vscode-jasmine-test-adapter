@@ -125,11 +125,8 @@ export class JasmineAdapter implements TestAdapter {
 		const config = this.config;
 		if (!config) return;
 
-		let tests: string[] | undefined;
-		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
-			tests = [];
-			this.collectTests(info, tests);
-		}
+		let tests: string[] = [];
+		this.collectTests(info, tests);
 
 		await new Promise<void>((resolve) => {
 
@@ -163,11 +160,8 @@ export class JasmineAdapter implements TestAdapter {
 
 		if (!this.config) return;
 
-		let tests: string[] | undefined;
-		if ((info.type === 'test') || !(info.id === 'root' || info.isFileSuite)) {
-			tests = [];
-			this.collectTests(info, tests);
-		}
+		let tests: string[] = [];
+		this.collectTests(info, tests);
 
 		const args = [ this.config.configFilePath ];
 		if (tests) {
