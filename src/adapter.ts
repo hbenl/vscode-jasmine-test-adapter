@@ -32,7 +32,8 @@ export class JasmineAdapter implements TestAdapter {
 	) {
 
 		vscode.workspace.onDidChangeConfiguration(configChange => {
-			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri)) {
+			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri)) {
 				this.config = undefined;
 				this.reloadEmitter.fire();
 			}
@@ -93,6 +94,7 @@ export class JasmineAdapter implements TestAdapter {
 					args,
 					{
 						cwd: this.workspaceFolder.uri.fsPath,
+						env: config.env,
 						execArgv: []
 					}
 				);
@@ -134,6 +136,7 @@ export class JasmineAdapter implements TestAdapter {
 				args,
 				{
 					cwd: this.workspaceFolder.uri.fsPath,
+					env: config.env,
 					execArgv: []
 				}
 			);
@@ -210,7 +213,21 @@ export class JasmineAdapter implements TestAdapter {
 			testFiles.push(...files);
 		}
 
-		return { configFilePath, specDir, testFileGlobs, testFiles };
+		const processEnv = process.env;
+		const configEnv: { [prop: string]: any } = adapterConfig.get('env') || {};
+
+		const env = { ...processEnv };
+
+		for (const prop in configEnv) {
+			const val = configEnv[prop];
+			if ((val === undefined) || (val === null)) {
+				delete env.prop;
+			} else {
+				env[prop] = String(val);
+			}
+		}
+
+		return { configFilePath, specDir, testFileGlobs, testFiles, env };
 	}
 
 	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
@@ -229,6 +246,7 @@ interface LoadedConfig {
 	specDir: string;
 	testFileGlobs: IMinimatch[];
 	testFiles: string[];
+	env: { [prop: string]: any };
 }
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {

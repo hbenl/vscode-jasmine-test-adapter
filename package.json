@@ -70,6 +70,15 @@
           "type": "string",
           "default": "spec/support/jasmine.json",
           "scope": "resource"
+        },
+        "jasmineExplorer.env": {
+          "description": "Environment variables to be set when running the tests",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "scope": "resource"
         }
       }
     }
