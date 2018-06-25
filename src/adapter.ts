@@ -175,6 +175,7 @@ export class JasmineAdapter implements TestAdapter {
 			program: require.resolve('./worker/runTests.js'),
 			args,
 			cwd: '${workspaceRoot}',
+			env: this.config.env,
 			stopOnEntry: false
 		});
 	}
