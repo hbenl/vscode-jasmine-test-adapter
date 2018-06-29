@@ -22,6 +22,8 @@ Run your Jasmine tests using the
 * `jasmineExplorer.config`: The location of the Jasmine config file (relative to the workspace folder) (default: `spec/support/jasmine.json`)
 * `jasmineExplorer.env`: Environment variables to be set when running the tests
 * `jasmineExplorer.nodePath`: The path to the node executable to use. By default it will attempt to find it on your PATH, if it can't find it or if this option is set to `null`, it will use the one shipped with VS Code
+* `jasmineExplorer.debuggerPort`: A port for running the debug sessions, (default: `9229`)
+* `jasmineExplorer.breakOnFirstLine`: Setting to true injects a breakpoint at the first line after your test, (default: `false`)
 * `testExplorer.codeLens`: Show a CodeLens above each test or suite for running or debugging the tests
 * `testExplorer.gutterDecoration`: Show the state of each test in the editor using Gutter Decorations
 * `testExplorer.onStart`: Retire or reset all test states whenever a test run is started
