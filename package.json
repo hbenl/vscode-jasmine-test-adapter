@@ -94,6 +94,12 @@
           ],
           "default": "default",
           "scope": "resource"
+        },
+        "jasmineExplorer.breakOnFirstLine": {
+          "description": "when debugging, inject a breakpoint at the 1st line of the 1st run test",
+          "type": "boolean",
+          "default": false,
+          "scope": "resource"
         }
       }
     }
