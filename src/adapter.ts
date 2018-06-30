@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { ChildProcess, fork } from 'child_process';
+import { ChildProcess, fork, execSync } from 'child_process';
 import * as fs from 'fs-extra';
 import * as vscode from 'vscode';
 import { Minimatch, IMinimatch } from 'minimatch';
@@ -95,6 +95,7 @@ export class JasmineAdapter implements TestAdapter {
 					{
 						cwd: this.workspaceFolder.uri.fsPath,
 						env: config.env,
+						execPath: config.nodePath,
 						execArgv: []
 					}
 				);
@@ -141,6 +142,7 @@ export class JasmineAdapter implements TestAdapter {
 				{
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
+					execPath: config.nodePath,
 					execArgv,
 				}
 			);
@@ -190,12 +192,21 @@ export class JasmineAdapter implements TestAdapter {
 		}
 	}
 
+	private getNodePath(): string | undefined {
+		try {
+			return execSync("which node").toString().trim();
+		} catch (e) {
+			return;
+		}
+	}
+
 	private async loadConfig(): Promise<LoadedConfig | undefined> {
 
 		const adapterConfig = vscode.workspace.getConfiguration('jasmineExplorer', this.workspaceFolder.uri);
 		const relativeConfigFilePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
 		const configFilePath = path.resolve(this.workspaceFolder.uri.fsPath, relativeConfigFilePath);
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
+		let nodePath: string | undefined = adapterConfig.get<string>('nodePath') || 'default';
 
 		let jasmineConfig: any;
 		try {
@@ -234,7 +245,11 @@ export class JasmineAdapter implements TestAdapter {
 			}
 		}
 
-		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort };
+		if (nodePath === 'default') {
+			nodePath = this.getNodePath();
+		}
+
+		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath };
 	}
 
 	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
@@ -254,6 +269,7 @@ interface LoadedConfig {
 	testFileGlobs: IMinimatch[];
 	testFiles: string[];
 	debuggerPort: number;
+	nodePath: string | undefined;
 	env: { [prop: string]: any };
 }
 
