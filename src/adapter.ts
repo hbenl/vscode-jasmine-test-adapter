@@ -120,7 +120,7 @@ export class JasmineAdapter implements TestAdapter {
 		}
 	}
 
-	async run(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
+	async run(info: JasmineTestSuiteInfo | TestInfo, execArgv: string[] = []): Promise<void> {
 
 		const config = this.config;
 		if (!config) return;
@@ -141,7 +141,7 @@ export class JasmineAdapter implements TestAdapter {
 				{
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
-					execArgv: []
+					execArgv,
 				}
 			);
 
@@ -159,25 +159,29 @@ export class JasmineAdapter implements TestAdapter {
 	async debug(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
 
 		if (!this.config) return;
-
-		let tests: string[] = [];
-		this.collectTests(info, tests);
-
-		const args = [ this.config.configFilePath ];
-		if (tests) {
-			args.push(JSON.stringify(tests));
+		const promise = this.run(info,  [`--inspect-brk=${this.config.debuggerPort}`]);
+		if (!promise || !this.runningTestProcess) {
+			return;
 		}
 
-		vscode.debug.startDebugging(this.workspaceFolder, {
+		await vscode.debug.startDebugging(this.workspaceFolder, {
 			name: 'Debug Jasmine Tests',
 			type: 'node',
-			request: 'launch',
-			program: require.resolve('./worker/runTests.js'),
-			args,
-			cwd: '${workspaceRoot}',
-			env: this.config.env,
-			stopOnEntry: false
+			request: 'attach',
+			port: this.config.debuggerPort,
+			protocol: 'inspector',
+			timeout: 30000,
+			stopOnEntry: false,
 		});
+
+		const currentSession = vscode.debug.activeDebugSession;
+		// Kill the process to ensure we're good once the de
+		vscode.debug.onDidTerminateDebugSession((session) => {
+			if (currentSession != session) { return; }
+			this.cancel(); // just ot be sure
+		});
+
+		return promise;
 	}
 
 	cancel(): void {
@@ -191,6 +195,7 @@ export class JasmineAdapter implements TestAdapter {
 		const adapterConfig = vscode.workspace.getConfiguration('jasmineExplorer', this.workspaceFolder.uri);
 		const relativeConfigFilePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
 		const configFilePath = path.resolve(this.workspaceFolder.uri.fsPath, relativeConfigFilePath);
+		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
 
 		let jasmineConfig: any;
 		try {
@@ -229,7 +234,7 @@ export class JasmineAdapter implements TestAdapter {
 			}
 		}
 
-		return { configFilePath, specDir, testFileGlobs, testFiles, env };
+		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort };
 	}
 
 	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
@@ -248,6 +253,7 @@ interface LoadedConfig {
 	specDir: string;
 	testFileGlobs: IMinimatch[];
 	testFiles: string[];
+	debuggerPort: number;
 	env: { [prop: string]: any };
 }
 

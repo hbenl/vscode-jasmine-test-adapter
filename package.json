@@ -79,6 +79,12 @@
           },
           "default": {},
           "scope": "resource"
+        },
+        "jasmineExplorer.debuggerPort": {
+          "description": "The preferred port to use for debugging sessions",
+          "type": "number",
+          "default": 9229,
+          "scope": "resource"
         }
       }
     }
