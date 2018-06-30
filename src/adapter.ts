@@ -338,13 +338,9 @@ interface LoadedConfig {
 	specDir: string;
 	testFileGlobs: IMinimatch[];
 	testFiles: string[];
-<<<<<<< 3632d366cd498fc6b8a53c652be9d533df57a03b
+	debuggerPort: number;
 	nodePath: string | undefined;
-=======
-	debuggerPort: number;
->>>>>>> Use attaching the debugger instead of the session.
 	env: { [prop: string]: any };
-	debuggerPort: number;
 	breakOnFirstLine: boolean;
 }
 
