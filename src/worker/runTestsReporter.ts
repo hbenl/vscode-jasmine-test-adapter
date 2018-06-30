@@ -9,11 +9,11 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 
 	specStarted(result: jasmine.CustomReporterResult): void {
 		if ((this.testsToReport === undefined) ||
-			(this.testsToReport.indexOf(result.description) >= 0)) {
+			(this.testsToReport.indexOf(result.fullName) >= 0)) {
 
 			const event: TestEvent = {
 				type: 'test',
-				test: result.description,
+				test: result.fullName,
 				state: 'running'
 			};
 	
@@ -31,31 +31,21 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 
 	specDone(result: jasmine.CustomReporterResult): void {
 		if ((this.testsToReport === undefined) ||
-			(this.testsToReport.indexOf(result.description) >= 0)) {
-
+			(this.testsToReport.indexOf(result.fullName) >= 0)) {
 			let message: string | undefined;
 			if (result.failedExpectations) {
 				message = result.failedExpectations.map(failed => failed.stack).join('\n');
 			}
 
 			const state = convertTestState(result.status);
-			let event: TestEvent
+			const event: TestEvent = {
+				type: 'test',
+				test: result.fullName,
+				state: convertTestState(result.status),
+				message,
+			}
 			if (state === 'failed') {
-				const f: FailedTestEvent = {
-					type: 'test',
-					test: result.description,
-					state: convertTestState(result.status),
-					message,
-					failures: result.failedExpectations
-				};
-				event = f;
-			} else {
-				event = {
-					type: 'test',
-					test: result.description,
-					state: convertTestState(result.status),
-					message,
-				};
+				(event as FailedTestEvent).failures = result.failedExpectations
 			}
 
 			this.sendMessage(event);

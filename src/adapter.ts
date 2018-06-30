@@ -113,7 +113,7 @@ export class JasmineAdapter implements TestAdapter {
 		});
 		
 		function findFile(suite: { file: string | undefined, children: any[] }): string | undefined {
-			if (!suite.file) {
+			if (!suite.file && suite.children) {
 				for(const child of suite.children) {
 					const file = findFile(child);
 					if (file) { return file; }
@@ -127,7 +127,7 @@ export class JasmineAdapter implements TestAdapter {
 		const suitesByFiles = suites.reduce((memo, suite) => {
 			const file = findFile(suite);
 			if (!file) {
-				throw new Error(`Unable to find the file in suite ${suite.label}` );
+				return memo;
 			}
 			const fileSuite = memo[file] ||  {
 				type: 'suite',

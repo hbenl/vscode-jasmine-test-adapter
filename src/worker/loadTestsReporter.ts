@@ -1,4 +1,5 @@
 import { TestSuiteInfo, TestInfo } from "vscode-test-adapter-api";
+import { Location } from "./loadTestsUtils";
 
 export class LoadTestsReporter implements jasmine.CustomReporter {
 
@@ -10,7 +11,8 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 	}
 
 	constructor(
-		private readonly done: (result: TestSuiteInfo) => void
+		private readonly done: (result: TestSuiteInfo) => void,
+		private readonly getLocations: () => {[id:string]: Location}
 	) {
 		this.rootSuite = {
 			type: 'suite',
@@ -24,34 +26,29 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	suiteStarted(result: jasmine.CustomReporterResult): void {
 		// The suite may be a JSON object, from injection
-		// With it's file location
 		const description = result.description;
-		let suite: TestSuiteInfo;
-		try {
-			const { name, location } = JSON.parse(description);
-			suite = {
-				type: 'suite',
-				id: name,
-				label: name,
-				file: location.file,
-				line: location.line,
-				children: []
-			};
-		} catch(e) {
-			suite = {
-				type: 'suite',
-				id: result.fullName,
-				label: description,
-				children: []
-			};
-		}
-
+		let suite: TestSuiteInfo = {
+			type: 'suite',
+			id: result.fullName,
+			label: description,
+			children: []
+		};
 		this.currentSuite.children.push(suite);
 		this.suiteStack.push(suite);
 	}
 
 	suiteDone(result: jasmine.CustomReporterResult): void {
 		const suite = this.suiteStack.pop();
+		
+		if (suite) {
+			const location = this.getLocations()[suite.id];
+			if (!location) {
+				console.log('Could not find location for suite', suite.id);
+			} else {
+				suite.file = location.file;
+				suite.line = location.line;
+			}
+		}
 		// Emit the suite when have been through it completely
 		// This ensure we don't serialize a massive object on done
 		if (suite && this.suiteStack.length <= 1) {
@@ -60,18 +57,19 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 	}
 
 	specDone(result: jasmine.CustomReporterResult): void {
-		// Desription is an array as injected before 
-		const description: any[] = result.description as any;
-		const {
-			line,
-			file
-		} = description[1];
 		const test: TestInfo = {
 			type: 'test',
-			id: result.description[0],
-			label: result.description[0],
-			line: line,
-			file: file,
+			id: result.fullName,
+			label: result.description,
+			line: undefined,
+			file: undefined,
+		}
+		const location = this.getLocations()[test.id];
+		if (!location) {
+			console.log('Could not find location for spec', result.fullName);
+		} else {
+			test.line = location.line,
+			test.file = location.file
 		}
 		this.currentSuite.children.push(test);
 	}

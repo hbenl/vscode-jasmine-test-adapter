@@ -1,6 +1,6 @@
 import Jasmine = require('jasmine');
 
-export function getStackLineMatching(test: (line: string) => boolean): object {
+export function getStackLineMatching(test: (line: string) => boolean): Location | undefined {
 	const err = new Error();
 	const stackLines = err.stack!.split('\n');
 	let lastFoundLine;
@@ -21,7 +21,7 @@ export function getStackLineMatching(test: (line: string) => boolean): object {
 
 	// Not found... nothing much we can do
 	if (!found) {
-		return {};
+		return;
 	}
 
 	const components = found.split(':');
@@ -36,25 +36,39 @@ export function getStackLineMatching(test: (line: string) => boolean): object {
 	}
 }
 
-export function patchJasmine(_jasmine: Jasmine, projectBaseDir: string) {
+export interface Location {
+	file: string
+	line: number
+}
+
+export function patchJasmine(_jasmine: Jasmine, projectBaseDir: string): () => {[id:string]: Location} {
 	// Monkey patch the it, so we can get the lines
+	const suiteStack: string[] = [];
 	const it = _jasmine.env.it;
+	const locations: {[id:string]: Location} = {};
 	_jasmine.env.it = function(desc, func) {
-		return it.call(this, [desc, getStackLineMatching((line) => {
+
+		const location = getStackLineMatching((line) => {
 			return line.indexOf('Suite.') >= 0 && line.indexOf(projectBaseDir) >= 0;
-		}), func]);
+		});
+		locations[suiteStack.join(' ')+' '+desc] = location as Location;
+		return it.call(this, desc, func);
 	}
 
 	// Here we need to inject the description in the name
 	const describe = _jasmine.env.describe;
 	_jasmine.env.describe = function(name, func) {
+		suiteStack.push(name);
 		const location = getStackLineMatching((line) => {
 			return line.indexOf(projectBaseDir) >= 0;
 		});
-		const fullName = JSON.stringify({
-			name,
-			location,
-		});
-		return describe.apply(_jasmine.env, [fullName, func]);
+		locations[suiteStack.join(' ')] = location as Location;
+		const result = describe.call(_jasmine.env, name, func);
+		suiteStack.pop();
+		return result;
+	}
+
+	return () => {
+		return locations;
 	}
 }
