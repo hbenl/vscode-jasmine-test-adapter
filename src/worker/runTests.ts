@@ -21,4 +21,4 @@ const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
 const _jasmine = new Jasmine({ baseProjectPath: process.cwd });
 _jasmine.loadConfigFile(configFile);
 _jasmine.execute(testFiles, regExp);
-_jasmine.addReporter(new RunTestsReporter(sendMessage, testsToRun));
+jasmine.getEnv().addReporter(new RunTestsReporter(sendMessage, testsToRun));

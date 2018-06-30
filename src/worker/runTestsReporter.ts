@@ -21,14 +21,6 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 		}
 	}
 
-	// Confirmance to jasmine.Report
-	reportRunnerStarting(runner: jasmine.Runner): void {}
-	reportRunnerResults(runner: jasmine.Runner): void {}
-	reportSuiteResults(suite: jasmine.Suite): void {}
-	reportSpecStarting(spec: jasmine.Spec): void {}
-	reportSpecResults(spec: jasmine.Spec): void {}
-	log(str: string): void {}
-
 	specDone(result: jasmine.CustomReporterResult): void {
 		if ((this.testsToReport === undefined) ||
 			(this.testsToReport.indexOf(result.fullName) >= 0)) {
