@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { TestExplorerExtension, testExplorerExtensionId } from 'vscode-test-adapter-api';
+import { TestExplorerExtension, testExplorerExtensionId, TestEvent } from 'vscode-test-adapter-api';
 import { JasmineAdapter } from './adapter';
+import { TestResultsManager } from './testStateManager';
 
 export async function activate(context: vscode.ExtensionContext) {
 
@@ -17,8 +18,15 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (vscode.workspace.workspaceFolders) {
 			for (const workspaceFolder of vscode.workspace.workspaceFolders) {
 				const adapter = new JasmineAdapter(workspaceFolder);
+				const resultsManager = new TestResultsManager(workspaceFolder.uri.fsPath, context);
+				adapter.testStates((event) => {
+					resultsManager.handle(event as TestEvent)
+				}, null, context.subscriptions);
 				registeredAdapters.set(workspaceFolder, adapter);
 				testExplorerExtension.exports.registerAdapter(adapter);
+
+				// Hover provider
+				vscode.languages.registerHoverProvider({ language: 'javascript', scheme: 'file' }, resultsManager);
 			}
 		}
 	
@@ -37,6 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
 				registeredAdapters.set(workspaceFolder, adapter);
 				testExplorerExtension.exports.registerAdapter(adapter);
 			}
-		});
+		}, null, context.subscriptions);
 	}
 }
