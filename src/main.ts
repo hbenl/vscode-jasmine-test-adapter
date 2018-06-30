@@ -5,7 +5,7 @@ import { JasmineAdapter } from './adapter';
 export async function activate(context: vscode.ExtensionContext) {
 
 	const testExplorerExtension = vscode.extensions.getExtension<TestExplorerExtension>(testExplorerExtensionId);
-
+	const channel = vscode.window.createOutputChannel('Jasmine Tests');
 	if (testExplorerExtension) {
 		
 		if (!testExplorerExtension.isActive) {
@@ -16,7 +16,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		if (vscode.workspace.workspaceFolders) {
 			for (const workspaceFolder of vscode.workspace.workspaceFolders) {
-				const adapter = new JasmineAdapter(workspaceFolder);
+				const adapter = new JasmineAdapter(workspaceFolder, channel);
 				registeredAdapters.set(workspaceFolder, adapter);
 				testExplorerExtension.exports.registerAdapter(adapter);
 			}
@@ -33,7 +33,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			}
 	
 			for (const workspaceFolder of event.added) {
-				const adapter = new JasmineAdapter(workspaceFolder);
+				const adapter = new JasmineAdapter(workspaceFolder, channel);
 				registeredAdapters.set(workspaceFolder, adapter);
 				testExplorerExtension.exports.registerAdapter(adapter);
 			}
