@@ -303,7 +303,6 @@ export class JasmineAdapter implements TestAdapter {
 
 		const processEnv = process.env;
 		const configEnv: { [prop: string]: any } = adapterConfig.get('env') || {};
-		const node: string | undefined = adapterConfig.get('node');
 		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		const env = { ...processEnv };
 
@@ -339,7 +338,11 @@ interface LoadedConfig {
 	specDir: string;
 	testFileGlobs: IMinimatch[];
 	testFiles: string[];
+<<<<<<< 3632d366cd498fc6b8a53c652be9d533df57a03b
 	nodePath: string | undefined;
+=======
+	debuggerPort: number;
+>>>>>>> Use attaching the debugger instead of the session.
 	env: { [prop: string]: any };
 	debuggerPort: number;
 	breakOnFirstLine: boolean;
