@@ -41,34 +41,51 @@ export interface Location {
 	line: number
 }
 
-export function patchJasmine(_jasmine: Jasmine, projectBaseDir: string): () => {[id:string]: Location} {
+export function patchJasmine(_jasmine: Jasmine): () => {[id:string]: Location} {
 	// Monkey patch the it, so we can get the lines
 	const suiteStack: string[] = [];
-	const it = _jasmine.env.it;
 	const locations: {[id:string]: Location} = {};
-	_jasmine.env.it = function(desc, func) {
+	const projectBaseDir = _jasmine.projectBaseDir;
+	const specMatcher = (line: string) => {
+		return line.indexOf('Suite.') >= 0 && line.indexOf(projectBaseDir) >= 0;
+	};
 
-		const location = getStackLineMatching((line) => {
-			return line.indexOf('Suite.') >= 0 && line.indexOf(projectBaseDir) >= 0;
-		});
-		locations[suiteStack.join(' ')+' '+desc] = location as Location;
-		return it.call(this, desc, func);
+	const suiteMatcher = (line: string) => {
+		return line.indexOf(projectBaseDir) >= 0;
+	};
+
+	const specPatch = function(impl: () => any): (name: string, func: any) => any {
+		return function(desc: string, func: any): any {
+			const location = getStackLineMatching(specMatcher);
+			locations[suiteStack.join(' ')+' '+desc] = location as Location;
+			return impl.call(_jasmine.env, desc, func);
+		}
 	}
 
-	// Here we need to inject the description in the name
-	const describe = _jasmine.env.describe;
-	_jasmine.env.describe = function(name, func) {
-		suiteStack.push(name);
-		const location = getStackLineMatching((line) => {
-			return line.indexOf(projectBaseDir) >= 0;
-		});
-		locations[suiteStack.join(' ')] = location as Location;
-		const result = describe.call(_jasmine.env, name, func);
-		suiteStack.pop();
-		return result;
+	const suitePatch = function(impl: () => any): (name: string, func: any) => any {
+		return function(name: string, func: any): any {
+			suiteStack.push(name);
+			const location = getStackLineMatching(suiteMatcher);
+			locations[suiteStack.join(' ')] = location as Location;
+			const result = impl.call(_jasmine.env, name, func);
+			suiteStack.pop();
+			return result;
+		}
 	}
 
-	return () => {
-		return locations;
-	}
+	const patches: { [id: string]: (impl: () => any) => (name: string, func: any) => any} = {
+		'it': specPatch,
+		'fit': specPatch,
+		'describe': suitePatch,
+		'xdescribe': suitePatch,
+		'fdescribe': suitePatch,
+	};
+
+	Object.keys(patches).forEach((key) => {
+		const patch = patches[key];
+		const impl = (_jasmine.env as any)[key];
+		(_jasmine.env as any)[key] = patch(impl);
+	});
+
+	return () => locations;
 }

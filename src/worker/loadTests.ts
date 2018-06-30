@@ -9,6 +9,6 @@ const projectBaseDir = process.argv[3] || process.cwd();
 
 const _jasmine = new Jasmine({ projectBaseDir });
 _jasmine.loadConfigFile(configFile);
-const getter = patchJasmine(_jasmine, projectBaseDir);
+const getter = patchJasmine(_jasmine);
 _jasmine.execute([], '$^');
 jasmine.getEnv().addReporter(new LoadTestsReporter(sendMessage, getter));
