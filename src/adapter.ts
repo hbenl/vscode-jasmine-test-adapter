@@ -112,20 +112,8 @@ export class JasmineAdapter implements TestAdapter {
 			});
 		});
 		
-		function findFile(suite: { file: string | undefined, children: any[] }): string | undefined {
-			if (!suite.file && suite.children) {
-				for(const child of suite.children) {
-					const file = findFile(child);
-					if (file) { return file; }
-				}
-			} else {
-				return suite.file;
-			}
-			return undefined;
-		}
-
 		const suitesByFiles = suites.reduce((memo, suite) => {
-			const file = findFile(suite);
+			const file = suite.file;
 			if (!file) {
 				return memo;
 			}
