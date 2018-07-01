@@ -1,77 +1,82 @@
-import * as fs from 'fs';
 import { TestSuiteInfo, TestInfo } from "vscode-test-adapter-api";
-import * as RegExpEscape from 'escape-string-regexp';
+import { Location } from "./loadTestsUtils";
 
 export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	private readonly rootSuite: TestSuiteInfo;
 	private readonly suiteStack: TestSuiteInfo[];
-	private readonly fileContent: string;
 
 	private get currentSuite(): TestSuiteInfo {
 		return this.suiteStack[this.suiteStack.length - 1];
 	}
 
 	constructor(
-		private readonly testFile: string,
-		private readonly done: (result: TestSuiteInfo) => void
+		private readonly done: (result: TestSuiteInfo) => void,
+		private readonly getLocations: () => {[id:string]: Location}
 	) {
 		this.rootSuite = {
 			type: 'suite',
-			id: testFile,
+			id: 'root',
 			label: '',
 			children: [],
-			file: testFile
 		};
 
 		this.suiteStack = [ this.rootSuite ];
-
-		this.fileContent = fs.readFileSync(testFile, 'utf8');
 	}
 
 	suiteStarted(result: jasmine.CustomReporterResult): void {
-
-		const suite: TestSuiteInfo = {
+		// The suite may be a JSON object, from injection
+		const description = result.description;
+		let suite: TestSuiteInfo = {
 			type: 'suite',
 			id: result.fullName,
-			label: result.description,
-			file: this.testFile,
-			line: this.findLineContaining(result.description),
+			label: description,
 			children: []
 		};
-
 		this.currentSuite.children.push(suite);
 		this.suiteStack.push(suite);
 	}
 
 	suiteDone(result: jasmine.CustomReporterResult): void {
-		this.suiteStack.pop();
+		const suite = this.suiteStack.pop();
+		
+		if (suite) {
+			const location = this.getLocations()[suite.id];
+			if (!location) {
+				console.log('Could not find location for suite', suite.id);
+			} else {
+				suite.file = location.file;
+				suite.line = location.line;
+			}
+		}
+		// Emit the suite when have been through it completely
+		// This ensure we don't serialize a massive object on done
+		if (suite && this.suiteStack.length <= 1) {
+			this.done(suite);
+		}
 	}
 
 	specDone(result: jasmine.CustomReporterResult): void {
-
 		const test: TestInfo = {
 			type: 'test',
 			id: result.fullName,
 			label: result.description,
-			file: this.testFile,
-			line: this.findLineContaining(result.description)
+			line: undefined,
+			file: undefined,
 		}
-
+		const location = this.getLocations()[test.id];
+		if (!location) {
+			console.log('Could not find location for spec', result.fullName);
+		} else {
+			test.line = location.line,
+			test.file = location.file
+		}
 		this.currentSuite.children.push(test);
 	}
 
 	jasmineDone(runDetails: jasmine.RunDetails): void {
 		this.sort(this.rootSuite);
 		this.done(this.rootSuite);
-	}
-
-	private findLineContaining(needle: string): number | undefined {
-
-		const index = this.fileContent.search(RegExpEscape(needle));
-		if (index < 0) return undefined;
-
-		return this.fileContent.substr(0, index).split('\n').length - 1;
 	}
 
 	private sort(suite: TestSuiteInfo): void {

@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { ChildProcess, fork, execSync } from 'child_process';
+import * as stream from 'stream';
 import * as fs from 'fs-extra';
 import * as os from 'os';
 import * as vscode from 'vscode';
@@ -29,9 +30,9 @@ export class JasmineAdapter implements TestAdapter {
 	}
 
 	constructor(
-		public readonly workspaceFolder: vscode.WorkspaceFolder
+		public readonly workspaceFolder: vscode.WorkspaceFolder,
+		public readonly channel: vscode.OutputChannel,
 	) {
-
 		vscode.workspace.onDidChangeConfiguration(configChange => {
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
@@ -83,40 +84,60 @@ export class JasmineAdapter implements TestAdapter {
 			label: 'Jasmine',
 			children: []
 		}
+		const suites: any[] = [];
 
-		for (const testFile of config.testFiles) {
+		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
 
-			let testSuiteInfo = await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
+			const args = [ config.configFilePath ];
+			const childProcess = fork(
+				require.resolve('./worker/loadTests.js'),
+				args,
+				{
+					cwd: this.workspaceFolder.uri.fsPath,
+					execPath: config.nodePath,
+					env: config.env,
+					execArgv: [],
+					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+				}
+			);
 
-				const args = [ config.configFilePath, testFile ];
-				let received: TestSuiteInfo | undefined;
+			this.pipeProcess(childProcess);
 
-				const childProcess = fork(
-					require.resolve('./worker/loadTests.js'),
-					args,
-					{
-						cwd: this.workspaceFolder.uri.fsPath,
-						env: config.env,
-						execPath: config.nodePath,
-						execArgv: []
-					}
-				);
-
-				childProcess.on('message', msg => received = msg);
-
-				childProcess.on('exit', () => resolve(received));
+			childProcess.on('message', (msg) => {
+				suites.push(msg);
 			});
 
-			if (testSuiteInfo !== undefined) {
-
-				testSuiteInfo.label = testFile.startsWith(config.specDir) ? testFile.substr(config.specDir.length) : testFile
-				testSuiteInfo.isFileSuite = true;
-
-				rootSuite.children.push(testSuiteInfo);
+			childProcess.on('exit', (exitVal) => {
+				resolve();
+			});
+		});
+		
+		const suitesByFiles = suites.reduce((memo, suite) => {
+			const file = suite.file;
+			if (!file) {
+				return memo;
 			}
-		}
+			const fileSuite = memo[file] ||  {
+				type: 'suite',
+				id: file,
+				file: file,
+				label: file.startsWith(config.specDir) ? file.substr(config.specDir.length) : file,
+				children: [],
+				isFileSuite: true,
+			}
+			fileSuite.children.push(suite);
+			memo[file] = fileSuite;
+			return memo;
+		}, {});
+
+		Object.keys(suitesByFiles).forEach((file) => {
+			rootSuite.children.push(suitesByFiles[file]);
+		});
 
 		if (rootSuite.children.length > 0) {
+			rootSuite.children.sort((a, b) => {
+				return a.id.toLowerCase() < b.id.toLowerCase() ? -1 : 1;
+			});
 			return rootSuite;
 		} else {
 			return undefined;
@@ -131,13 +152,15 @@ export class JasmineAdapter implements TestAdapter {
 		let tests: string[] = [];
 		this.collectTests(info, tests);
 
-		await new Promise<void>((resolve) => {
-
-			const args = [ config.configFilePath ];
-			if (tests) {
-				args.push(JSON.stringify(tests));
+		const args = [ config.configFilePath ];
+		if (tests) {
+			args.push(JSON.stringify(tests));
+			if (info.file) {
+				args.push(info.file);
 			}
+		}
 
+		return new Promise<void>((resolve) => {
 			this.runningTestProcess = fork(
 				require.resolve('./worker/runTests.js'),
 				args,
@@ -146,8 +169,11 @@ export class JasmineAdapter implements TestAdapter {
 					env: config.env,
 					execPath: config.nodePath,
 					execArgv,
+					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
+
+			this.pipeProcess(this.runningTestProcess);
 
 			this.runningTestProcess.on('message', 
 				event => this.testStatesEmitter.fire(<TestEvent>event)
@@ -161,8 +187,22 @@ export class JasmineAdapter implements TestAdapter {
 	}
 
 	async debug(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
+		if (!this.config) {
+			return;
+		}
 
-		if (!this.config) return;
+		let currentSession: vscode.DebugSession | undefined; 
+		// Add a breakpoint on the 1st line of the debugger
+		if (this.config.breakOnFirstLine) {
+			const fileURI = vscode.Uri.file(info.file!);
+			const brekpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(info.line! + 1, 0)))
+			vscode.debug.addBreakpoints([brekpoint]);
+			vscode.debug.onDidTerminateDebugSession((session) => {
+				if (currentSession != session) { return; }
+				vscode.debug.removeBreakpoints([brekpoint]);
+			});
+		}
+
 		const promise = this.run(info,  [`--inspect-brk=${this.config.debuggerPort}`]);
 		if (!promise || !this.runningTestProcess) {
 			return;
@@ -178,7 +218,8 @@ export class JasmineAdapter implements TestAdapter {
 			stopOnEntry: false,
 		});
 
-		const currentSession = vscode.debug.activeDebugSession;
+		currentSession = vscode.debug.activeDebugSession;
+
 		// Kill the process to ensure we're good once the de
 		vscode.debug.onDidTerminateDebugSession((session) => {
 			if (currentSession != session) { return; }
@@ -186,6 +227,17 @@ export class JasmineAdapter implements TestAdapter {
 		});
 
 		return promise;
+	}
+
+	private pipeProcess(process: ChildProcess) {
+		this.channel.show(true);
+		var customStream = new stream.Writable();
+		customStream._write = (data, encoding, callback) => {
+			this.channel.append(data.toString());
+			callback();
+		};
+		process.stderr.pipe(customStream);
+		process.stdout.pipe(customStream);
 	}
 
 	cancel(): void {
@@ -239,7 +291,7 @@ export class JasmineAdapter implements TestAdapter {
 
 		const processEnv = process.env;
 		const configEnv: { [prop: string]: any } = adapterConfig.get('env') || {};
-
+		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		const env = { ...processEnv };
 
 		for (const prop in configEnv) {
@@ -255,7 +307,7 @@ export class JasmineAdapter implements TestAdapter {
 			nodePath = this.getNodePath();
 		}
 
-		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath };
+		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath, breakOnFirstLine};
 	}
 
 	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
@@ -277,6 +329,7 @@ interface LoadedConfig {
 	debuggerPort: number;
 	nodePath: string | undefined;
 	env: { [prop: string]: any };
+	breakOnFirstLine: boolean;
 }
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {
