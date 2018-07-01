@@ -211,7 +211,7 @@ export class JasmineAdapter implements TestAdapter {
 		const relativeConfigFilePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
 		const configFilePath = path.resolve(this.workspaceFolder.uri.fsPath, relativeConfigFilePath);
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
-		let nodePath: string | undefined = adapterConfig.get<string>('nodePath') || 'default';
+		let nodePath: string | undefined = adapterConfig.get<string>('nodePath') || undefined;
 
 		let jasmineConfig: any;
 		try {
