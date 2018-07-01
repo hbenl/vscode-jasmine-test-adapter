@@ -34,7 +34,8 @@ export class JasmineAdapter implements TestAdapter {
 
 		vscode.workspace.onDidChangeConfiguration(configChange => {
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
-				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri)) {
+				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri)) {
 				this.config = undefined;
 				this.reloadEmitter.fire();
 			}
@@ -198,7 +199,7 @@ export class JasmineAdapter implements TestAdapter {
 			if (os.platform() === 'win32') {
 				return execSync("where node").toString().trim();
 			} else {
-			return execSync("which node").toString().trim();
+				return execSync("which node").toString().trim();
 			}
 		} catch (e) {
 			return;
