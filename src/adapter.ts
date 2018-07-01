@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { ChildProcess, fork, execSync } from 'child_process';
 import * as fs from 'fs-extra';
+import * as os from 'os';
 import * as vscode from 'vscode';
 import { Minimatch, IMinimatch } from 'minimatch';
 import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo } from 'vscode-test-adapter-api';
@@ -194,7 +195,11 @@ export class JasmineAdapter implements TestAdapter {
 
 	private getNodePath(): string | undefined {
 		try {
+			if (os.platform() === 'win32') {
+				return execSync("where node").toString().trim();
+			} else {
 			return execSync("which node").toString().trim();
+			}
 		} catch (e) {
 			return;
 		}
