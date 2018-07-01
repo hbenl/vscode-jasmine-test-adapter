@@ -64,14 +64,13 @@ export class FailuresStore {
 		this.errorsByName[test.toString()] = failure;
 	}
 
-	public remove(fromEvent: TestEvent) {
-		const name = fromEvent.test;
-		const originalError = this.errorsByName[name.toString()];
+	public remove(test: string) {
+		const originalError = this.errorsByName[test];
 		if (!originalError) { return; }
 		if (!this.errors[originalError.file]) { return; }
 		Object.keys(this.errors[originalError.file]).forEach((key) => {
 			const error = this.errors[originalError.file][key];
-			if (error.originalEvent.test === fromEvent.test) {
+			if (error.originalEvent.test === test) {
 				delete this.errors[originalError.file][key];
 			}
 		});
@@ -100,9 +99,41 @@ export class FailuresStore {
 	}
 }
 
+class DecorationStore {
+	private decorations: {[id: string]: vscode.Disposable[]} = {}
+
+	generateErrorDecoration(error: TestFailure): vscode.TextEditorDecorationType {
+		const decoration = vscode.window.createTextEditorDecorationType({
+			backgroundColor: 'rgba(255,0,0,0.3)',
+			isWholeLine: true,
+			overviewRulerColor: 'rgba(255,0,0,0.3)',
+			after: {
+				contentText: ` // ${error.message}`
+			}
+		});
+		const file = error.file;
+		if (!this.decorations[file]) {
+			this.decorations[file] = [];
+		}
+		this.decorations[file].push(decoration);
+		return decoration
+	}
+
+	disposeInlineErrorDecorations(path: string) {
+		const decorations = this.decorations[path];
+		if (!decorations) { return }
+		decorations.forEach((decoration) => {
+			decoration.dispose();
+		});
+		delete this.decorations[path];
+	}
+}
+
 export class TestResultsManager {
 	private store: FailuresStore = new FailuresStore()
+	private decorations = new DecorationStore();
 	private workspace: string
+
 	failedTestDecoration = vscode.window.createTextEditorDecorationType({
 		backgroundColor: 'rgba(255,0,0,0.3)',
 		isWholeLine: true,
@@ -112,43 +143,40 @@ export class TestResultsManager {
 	constructor(workspace: string, context: vscode.ExtensionContext) {
 		this.workspace = workspace
 		vscode.window.onDidChangeActiveTextEditor((editor) => {
-			this.updateErrorMarkers();
+			if (!editor) { return; }
+			this.updateErrorMarkers(editor);
 		}, null, context.subscriptions);
 	}
 
 	public handle(event: TestEvent) {
 		if (event.state === 'running') {
-			this.store.remove(event);
+			this.store.remove(event.test.toString());
 		}
 		if (event.state === 'passed') {
-			this.store.remove(event);
+			this.store.remove(event.test.toString());
 		}
 		if (event.state === 'failed' &&
 			event.message) {
-			const failures = TestFailure.failures(event, this.workspace);
-			failures.forEach((error) => this.store.add(error));
+			TestFailure.failures(event, this.workspace)
+				.forEach((error) => this.store.add(error));
 		}
-		this.updateErrorMarkers();
+		vscode.window.visibleTextEditors.forEach((editor) => {
+			this.updateErrorMarkers(editor);
+		});
 	}
 
-	private updateErrorMarkers() {
-		const decorations = this.store.all((error) => {
-			return error.file === vscode.window.activeTextEditor!.document.uri.fsPath;
-		}).map((err) => {
+	private updateErrorMarkers(editor: vscode.TextEditor) {
+		const currentFile = editor.document.uri.fsPath;
+		this.decorations.disposeInlineErrorDecorations(currentFile);
+		this.store.all((error) => {
+			return error.file === currentFile;
+		}).forEach((err) => {
 			const options: vscode.DecorationOptions = {
 				range: new vscode.Range(new vscode.Position(err.line-1,0), new vscode.Position(err.line-1, 0)),
 				hoverMessage: err.message
 			};
-			return options;
+			const decoration = this.decorations.generateErrorDecoration(err);
+			editor.setDecorations(decoration, [options]);
 		});
-		vscode.window.activeTextEditor!.setDecorations(this.failedTestDecoration, decorations);
-	}
-
-	provideHover(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
-		const error = this.store.get(document.fileName, position.line + 1);
-		if (!error) { return; }
-		return new vscode.Hover(`**${error.message}**`, new vscode.Range(position, position));
 	}
 }
-
-

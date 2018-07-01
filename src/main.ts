@@ -26,9 +26,6 @@ export async function activate(context: vscode.ExtensionContext) {
 				}, null, context.subscriptions);
 				registeredAdapters.set(workspaceFolder, adapter);
 				testExplorerExtension.exports.registerAdapter(adapter);
-
-				// Hover provider
-				vscode.languages.registerHoverProvider({ language: 'javascript', scheme: 'file' }, resultsManager);
 			}
 		}
 
