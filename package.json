@@ -88,7 +88,10 @@
         },
         "jasmineExplorer.nodePath": {
           "description": "The path to your node setup, by default it will attemp to use the result of `which node`",
-          "type": "string | null",
+          "type": [
+            "string",
+            "null"
+          ],
           "default": "default",
           "scope": "resource"
         }
