@@ -8,10 +8,11 @@ function getWorkspaceRegistrar(
 	context: vscode.ExtensionContext) {
 
 	const registeredAdapters = new Map<vscode.WorkspaceFolder, JasmineAdapter>();
+	const channel = vscode.window.createOutputChannel('Jasmine Tests');
 
 	function add(workspaces: vscode.WorkspaceFolder[]) {
 		for (const workspaceFolder of workspaces) {
-			const adapter = new JasmineAdapter(workspaceFolder);
+			const adapter = new JasmineAdapter(workspaceFolder, channel);
 			const manager = new TestDecorationsManager(workspaceFolder.uri.fsPath, context);
 			adapter.testStates((event) => 
 				manager.handle(event as TestEvent)

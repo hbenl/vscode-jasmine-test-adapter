@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { ChildProcess, fork, execSync } from 'child_process';
+import * as stream from 'stream';
 import * as fs from 'fs-extra';
 import * as os from 'os';
 import * as vscode from 'vscode';
@@ -29,9 +30,9 @@ export class JasmineAdapter implements TestAdapter {
 	}
 
 	constructor(
-		public readonly workspaceFolder: vscode.WorkspaceFolder
+		public readonly workspaceFolder: vscode.WorkspaceFolder,
+		public readonly channel: vscode.OutputChannel,
 	) {
-
 		vscode.workspace.onDidChangeConfiguration(configChange => {
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
@@ -98,9 +99,12 @@ export class JasmineAdapter implements TestAdapter {
 						cwd: this.workspaceFolder.uri.fsPath,
 						env: config.env,
 						execPath: config.nodePath,
-						execArgv: []
+						execArgv: [],
+						stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 					}
 				);
+
+				this.pipeProcess(childProcess);
 
 				childProcess.on('message', msg => received = msg);
 
@@ -146,8 +150,11 @@ export class JasmineAdapter implements TestAdapter {
 					env: config.env,
 					execPath: config.nodePath,
 					execArgv,
+					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
+
+			this.pipeProcess(this.runningTestProcess);
 
 			this.runningTestProcess.on('message', 
 				event => this.testStatesEmitter.fire(<TestEvent>event)
@@ -186,6 +193,16 @@ export class JasmineAdapter implements TestAdapter {
 		});
 
 		return promise;
+	}
+
+	private pipeProcess(process: ChildProcess) {
+		var customStream = new stream.Writable();
+		customStream._write = (data, encoding, callback) => {
+			this.channel.append(data.toString());
+			callback();
+		};
+		process.stderr.pipe(customStream);
+		process.stdout.pipe(customStream);
 	}
 
 	cancel(): void {
