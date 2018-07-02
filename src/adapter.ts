@@ -84,7 +84,6 @@ export class JasmineAdapter implements TestAdapter {
 			label: 'Jasmine',
 			children: []
 		}
-		const suites: any[] = [];
 
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
 			const args = [ config.configFilePath ];
@@ -102,8 +101,12 @@ export class JasmineAdapter implements TestAdapter {
 
 			this.pipeProcess(childProcess);
 
+			// The loader emits one suite per file, in order of appearance
+			// This way the only thing we need to do is just to replace the name
+			// With a shorter one
 			childProcess.on('message', (msg) => {
-				suites.push(msg);
+				msg.label = msg.file.replace(config.specDir, '');
+				rootSuite.children.push(msg);
 			});
 
 			childProcess.on('exit', (exitVal) => {
@@ -111,32 +114,7 @@ export class JasmineAdapter implements TestAdapter {
 			});
 		});
 		
-		const suitesByFiles = suites.reduce((memo, suite) => {
-			const file = suite.file;
-			if (!file) {
-				return memo;
-			}
-			const fileSuite = memo[file] ||  {
-				type: 'suite',
-				id: file,
-				file: file,
-				label: file.startsWith(config.specDir) ? file.substr(config.specDir.length) : file,
-				children: [],
-				isFileSuite: true,
-			}
-			fileSuite.children.push(suite);
-			memo[file] = fileSuite;
-			return memo;
-		}, {});
-
-		Object.keys(suitesByFiles).forEach((file) => {
-			rootSuite.children.push(suitesByFiles[file]);
-		});
-
 		if (rootSuite.children.length > 0) {
-			rootSuite.children.sort((a, b) => {
-				return a.id.toLowerCase() < b.id.toLowerCase() ? -1 : 1;
-			});
 			return rootSuite;
 		} else {
 			return undefined;

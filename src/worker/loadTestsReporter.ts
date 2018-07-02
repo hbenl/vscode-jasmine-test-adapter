@@ -5,6 +5,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	private readonly rootSuite: TestSuiteInfo;
 	private readonly suiteStack: TestSuiteInfo[];
+	private currentFile: string | undefined;
 
 	private get currentSuite(): TestSuiteInfo {
 		return this.suiteStack[this.suiteStack.length - 1];
@@ -22,44 +23,47 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 		};
 
 		this.suiteStack = [ this.rootSuite ];
+
+		// we use process on exit as jasmineDone may not be called
+		process.on('exit', () => {
+			this.emitLastSuite();
+		});
+	}
+
+	makeFileSuite(file: string): TestSuiteInfo {
+		return {
+			type: 'suite',
+			id: file,
+			file: file,
+			label: file,
+			children: [],
+			isFileSuite: true,
+		} as TestSuiteInfo
 	}
 
 	suiteStarted(result: jasmine.CustomReporterResult): void {
-
-		// The suite may be a JSON object, from injection
 		const description = result.description;
+		const location = this.getLocations()[result.fullName];
+		
 		const suite: TestSuiteInfo = {
 			type: 'suite',
 			id: result.fullName,
 			label: description,
+			file: location.file,
+			line: location.line,
 			children: []
 		};
 
+		this.processCurrentLocation(location);
 		this.currentSuite.children.push(suite);
 		this.suiteStack.push(suite);
 	}
 
-	suiteDone(result: jasmine.CustomReporterResult): void {
-		const suite = this.suiteStack.pop();
-		
-		if (suite) {
-			const location = this.getLocations()[suite.id];
-			if (!location) {
-				console.log('Could not find location for suite', suite.id);
-			} else {
-				suite.file = location.file;
-				suite.line = location.line;
-			}
-		}
-		// Emit the suite when have been through it completely
-		// This ensure we don't serialize a massive object on done
-		if (suite && this.suiteStack.length <= 1) {
-			this.done(suite);
-		}
+	suiteDone() {
+		this.suiteStack.pop();
 	}
 
-	specDone(result: jasmine.CustomReporterResult): void {
-
+	specStarted(result: jasmine.CustomReporterResult): void {
 		const test: TestInfo = {
 			type: 'test',
 			id: result.fullName,
@@ -73,29 +77,30 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 			test.line = location.line,
 			test.file = location.file
 		}
-
+		this.processCurrentLocation(location);
 		this.currentSuite.children.push(test);
 	}
 
-	jasmineDone(runDetails: jasmine.RunDetails): void {
-		this.sort(this.rootSuite);
-		this.done(this.rootSuite);
+	// This method will add a file suite if we changed
+	// The current file we're currenlty processing and push it 
+	// On to the stack
+	// It will also emit through this.done() the last file
+	// This way we emit one suite per file, which keeps things manageable
+	// and mall enought for IPC
+	private processCurrentLocation(location: Location) {
+		if (location.file != this.currentFile) {
+			const fileSuite = this.makeFileSuite(location.file);
+			this.emitLastSuite();
+			this.currentFile = location.file;
+			this.suiteStack.push(fileSuite);
+		}
 	}
-
-	private sort(suite: TestSuiteInfo): void {
-
-		suite.children.sort((a, b) => {
-			if ((a.line !== undefined) && (b.line !== undefined) && (a.line !== b.line)) {
-				return a.line - b.line;
-			} else {
-				return a.label.localeCompare(b.label);
-			}
-		});
-
-		for (const child of suite.children) {
-			if (child.type === 'suite') {
-				this.sort(child);
-			}
+	
+	private emitLastSuite() {
+		if (!this.currentFile) { return; }
+		const doneSuite = this.suiteStack.pop();
+		if (doneSuite) {
+			this.done(doneSuite);
 		}
 	}
 }
