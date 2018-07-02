@@ -3,19 +3,28 @@ import Jasmine = require('jasmine');
 export function getStackLineMatching(test: (line: string) => boolean): Location | undefined {
 	const err = new Error();
 	const stackLines = err.stack!.split('\n');
-	let lastFoundLine;
 	let found;
-	// As long as we have 2 consecutive lines up the stack
-	// in our project, that means the it / describe originate from 
-	// one of the helpers / global variable, walking up ensure
-	// the file location is not where the describe is defined
-	// but where it's called in the code
-	while (!found && stackLines.length > 0) {
+	// Find the line that match the function call (at it, at describe etc...);
+	while (stackLines.length > 0) {
 		const line = stackLines.shift()!;
 		if (test(line)) {
-			lastFoundLine = line;
-		} else if (lastFoundLine) {
-			found = lastFoundLine;
+			found = stackLines.shift()!;
+			break;
+		}
+	}
+
+	if (!found) {
+		return;
+	}
+	
+	// Walk up until we get out of the spec module to have the higest call site
+	// the function may be called by jasmine (inside a Suite), or from the module loader (module.js)
+	while (stackLines.length > 0) {
+		const nextLine = stackLines.shift()!;
+		if (nextLine.indexOf('module.js') >= 0  || nextLine.indexOf('lib/jasmine-core') >= 0) {
+			break;
+		} else {
+			found = nextLine;
 		}
 	}
 
@@ -45,27 +54,33 @@ export function patchJasmine(_jasmine: Jasmine): () => {[id:string]: Location} {
 	// Monkey patch the it, so we can get the lines
 	const suiteStack: string[] = [];
 	const locations: {[id:string]: Location} = {};
-	const projectBaseDir = _jasmine.projectBaseDir;
-	const specMatcher = (line: string) => {
-		return line.indexOf('Suite.') >= 0 && line.indexOf(projectBaseDir) >= 0;
-	};
+	const getMatcher = (element: string) => {
+		return (line: string) => {
+			return line.indexOf(`at ${element}`) >= 0;
+		};
+	}
 
-	const suiteMatcher = (line: string) => {
-		return line.indexOf(projectBaseDir) >= 0;
-	};
+	function getSuitePrefix() {
+		if (suiteStack.length > 0) {
+			return suiteStack.join(' ')+' ';
+		}
+		return '';
+	}
 
-	const specPatch = function(impl: () => any): (name: string, func: any) => any {
+	const specPatch = function(impl: () => any, functionKey: string): (name: string, func: any) => any {
 		return function(desc: string, func: any): any {
-			const location = getStackLineMatching(specMatcher);
-			locations[suiteStack.join(' ')+' '+desc] = location as Location;
+			const location = getStackLineMatching(getMatcher(functionKey));
+			if (location) {
+				locations[getSuitePrefix()+desc] = location as Location;
+			}
 			return impl.call(_jasmine.env, desc, func);
 		}
 	}
 
-	const suitePatch = function(impl: () => any): (name: string, func: any) => any {
+	const suitePatch = function(impl: () => any, functionKey: string): (name: string, func: any) => any {
 		return function(name: string, func: any): any {
 			suiteStack.push(name);
-			const location = getStackLineMatching(suiteMatcher);
+			const location = getStackLineMatching(getMatcher(functionKey));
 			locations[suiteStack.join(' ')] = location as Location;
 			const result = impl.call(_jasmine.env, name, func);
 			suiteStack.pop();
@@ -73,9 +88,10 @@ export function patchJasmine(_jasmine: Jasmine): () => {[id:string]: Location} {
 		}
 	}
 
-	const patches: { [id: string]: (impl: () => any) => (name: string, func: any) => any} = {
+	const patches: { [id: string]: (impl: () => any, functionKey: string) => (name: string, func: any) => any} = {
 		'it': specPatch,
 		'fit': specPatch,
+		'xit': specPatch,
 		'describe': suitePatch,
 		'xdescribe': suitePatch,
 		'fdescribe': suitePatch,
@@ -84,7 +100,7 @@ export function patchJasmine(_jasmine: Jasmine): () => {[id:string]: Location} {
 	Object.keys(patches).forEach((key) => {
 		const patch = patches[key];
 		const impl = (_jasmine.env as any)[key];
-		(_jasmine.env as any)[key] = patch(impl);
+		(_jasmine.env as any)[key] = patch(impl, key);
 	});
 
 	return () => locations;
