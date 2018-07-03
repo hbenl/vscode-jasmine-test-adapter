@@ -13,31 +13,18 @@ export function getStackLineMatching(test: (line: string) => boolean): Location 
 		}
 	}
 
-	if (!found) {
-		return;
-	}
-	
-	// Walk up until we get out of the spec module to have the higest call site
-	// the function may be called by jasmine (inside a Suite), or from the module loader (module.js)
-	while (stackLines.length > 0) {
-		const nextLine = stackLines.shift()!;
-		// Check if after we're inside the module loader or this module
-		// Which means we're at the highest point for the stacktrace
-		if (nextLine.indexOf('module.js') >= 0
-			|| nextLine.indexOf('modules/cjs/loader') >= 0
-			|| nextLine.indexOf('lib/jasmine-core') >= 0) {
-			break;
-		} else {
-			found = nextLine;
-		}
-	}
-
 	// Not found... nothing much we can do
 	if (!found) {
 		return;
 	}
 
-	const components = found.split(':');
+	// Stack line look like: at Suite.describe (/Users/florent/src/Parse/parse-server/spec/WinstonLoggerAdapter.spec.js:59:3)
+	// OR, anon functions: at /Users/florent/src/vscode-jasmine-test-adapter/node_modules/jasmine/lib/jasmine.js:88:5
+	const elements = found.trim().split(' ');
+	// We should have: 'at', '...', '(file..)'
+	let filePart = elements[elements.length - 1]; // the ile part is always last
+	const components = filePart.split(':');
+	// should be: "/Users/florent/src/vscode-jasmine-test-adapter/node_modules/jasmine/lib/jasmine.js", "88", "5"
 	const specLine = components[components.length - 2];
 	let file = components[0];
 	if (file.indexOf('(') >= 0) {
