@@ -21,7 +21,11 @@ export function getStackLineMatching(test: (line: string) => boolean): Location 
 	// the function may be called by jasmine (inside a Suite), or from the module loader (module.js)
 	while (stackLines.length > 0) {
 		const nextLine = stackLines.shift()!;
-		if (nextLine.indexOf('module.js') >= 0  || nextLine.indexOf('lib/jasmine-core') >= 0) {
+		// Check if after we're inside the module loader or this module
+		// Which means we're at the highest point for the stacktrace
+		if (nextLine.indexOf('module.js') >= 0
+			|| nextLine.indexOf('modules/cjs/loader') >= 0
+			|| nextLine.indexOf('lib/jasmine-core') >= 0) {
 			break;
 		} else {
 			found = nextLine;
