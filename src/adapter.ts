@@ -85,6 +85,8 @@ export class JasmineAdapter implements TestAdapter {
 			children: []
 		}
 
+		const suites: {[id: string]: TestSuiteInfo} = {};
+
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
 			const args = [ config.configFilePath ];
 			const childProcess = fork(
@@ -101,19 +103,43 @@ export class JasmineAdapter implements TestAdapter {
 
 			this.pipeProcess(childProcess);
 
-			// The loader emits one suite per file, in order of appearance
+			// The loader emits one suite per file, in order of running
+			// When running in random order, the same file may have multiple suites emitted
 			// This way the only thing we need to do is just to replace the name
 			// With a shorter one
 			childProcess.on('message', (msg) => {
 				msg.label = msg.file.replace(config.specDir, '');
-				rootSuite.children.push(msg);
+				const file = msg.file;
+				if (suites[file]) {
+					suites[file].children = suites[file].children.concat(msg.children);
+				} else {
+					suites[file] = msg;
+				}
 			});
 
 			childProcess.on('exit', (exitVal) => {
 				resolve();
 			});
 		});
-		
+
+		function sort(suite: (TestInfo | TestSuiteInfo)) {
+			const s = suite as TestSuiteInfo;
+			if (s.children) {
+				s.children = s.children.sort((a, b) => {
+					return a.line! - b.line!;
+				});
+				s.children.forEach((suite) => sort(suite));
+			}
+			return s;
+		}
+
+		// Sort the suites by their filenames
+		Object.keys(suites).sort((a, b) => {
+			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
+		}).forEach((file) => {
+			rootSuite.children.push(sort(suites[file]));
+		});
+
 		if (rootSuite.children.length > 0) {
 			return rootSuite;
 		} else {
