@@ -4,15 +4,22 @@ import { RunTestsReporter } from './runTestsReporter';
 
 const sendMessage = process.send ? (message: any) => process.send!(message) : () => {};
 
-const configFile = process.argv[2];
 let testsToRun: string[] | undefined;
-if (process.argv.length > 3) {
-	testsToRun = JSON.parse(process.argv[3]);
+let testFiles = [];
+
+const argv = process.argv;
+const configFile = argv[2];
+
+if (argv.length > 3) {
+	testsToRun = JSON.parse(argv[3]);
+}
+
+if (argv.length > 4) {
+	testFiles.push(argv[4]);
 }
 
 const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
-
-const _jasmine = new Jasmine({});
-jasmine.getEnv().addReporter(new RunTestsReporter(sendMessage, testsToRun));
+const _jasmine = new Jasmine({ baseProjectPath: process.cwd });
 _jasmine.loadConfigFile(configFile);
-_jasmine.execute(undefined, regExp);
+_jasmine.execute(testFiles, regExp);
+jasmine.getEnv().addReporter(new RunTestsReporter(sendMessage, testsToRun));

@@ -85,40 +85,60 @@ export class JasmineAdapter implements TestAdapter {
 			children: []
 		}
 
-		for (const testFile of config.testFiles) {
+		const suites: {[id: string]: TestSuiteInfo} = {};
 
-			let testSuiteInfo = await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
+		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
+			const args = [ config.configFilePath ];
+			const childProcess = fork(
+				require.resolve('./worker/loadTests.js'),
+				args,
+				{
+					cwd: this.workspaceFolder.uri.fsPath,
+					env: config.env,
+					execPath: config.nodePath,
+					execArgv: [],
+					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+				}
+			);
 
-				const args = [ config.configFilePath, testFile ];
-				let received: TestSuiteInfo | undefined;
+			this.pipeProcess(childProcess);
 
-				const childProcess = fork(
-					require.resolve('./worker/loadTests.js'),
-					args,
-					{
-						cwd: this.workspaceFolder.uri.fsPath,
-						env: config.env,
-						execPath: config.nodePath,
-						execArgv: [],
-						stdio: ['pipe', 'pipe', 'pipe', 'ipc']
-					}
-				);
-
-				this.pipeProcess(childProcess);
-
-				childProcess.on('message', msg => received = msg);
-
-				childProcess.on('exit', () => resolve(received));
+			// The loader emits one suite per file, in order of running
+			// When running in random order, the same file may have multiple suites emitted
+			// This way the only thing we need to do is just to replace the name
+			// With a shorter one
+			childProcess.on('message', (msg) => {
+				msg.label = msg.file.replace(config.specDir, '');
+				const file = msg.file;
+				if (suites[file]) {
+					suites[file].children = suites[file].children.concat(msg.children);
+				} else {
+					suites[file] = msg;
+				}
 			});
 
-			if (testSuiteInfo !== undefined) {
+			childProcess.on('exit', (exitVal) => {
+				resolve();
+			});
+		});
 
-				testSuiteInfo.label = testFile.startsWith(config.specDir) ? testFile.substr(config.specDir.length) : testFile
-				testSuiteInfo.isFileSuite = true;
-
-				rootSuite.children.push(testSuiteInfo);
+		function sort(suite: (TestInfo | TestSuiteInfo)) {
+			const s = suite as TestSuiteInfo;
+			if (s.children) {
+				s.children = s.children.sort((a, b) => {
+					return a.line! - b.line!;
+				});
+				s.children.forEach((suite) => sort(suite));
 			}
+			return s;
 		}
+
+		// Sort the suites by their filenames
+		Object.keys(suites).sort((a, b) => {
+			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
+		}).forEach((file) => {
+			rootSuite.children.push(sort(suites[file]));
+		});
 
 		if (rootSuite.children.length > 0) {
 			return rootSuite;
@@ -135,13 +155,15 @@ export class JasmineAdapter implements TestAdapter {
 		let tests: string[] = [];
 		this.collectTests(info, tests);
 
-		await new Promise<void>((resolve) => {
-
-			const args = [ config.configFilePath ];
-			if (tests) {
-				args.push(JSON.stringify(tests));
+		const args = [ config.configFilePath ];
+		if (tests) {
+			args.push(JSON.stringify(tests));
+			if (info.file) {
+				args.push(info.file);
 			}
+		}
 
+		return new Promise<void>((resolve) => {
 			this.runningTestProcess = fork(
 				require.resolve('./worker/runTests.js'),
 				args,
@@ -168,8 +190,22 @@ export class JasmineAdapter implements TestAdapter {
 	}
 
 	async debug(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
+		if (!this.config) {
+			return;
+		}
 
-		if (!this.config) return;
+		let currentSession: vscode.DebugSession | undefined; 
+		// Add a breakpoint on the 1st line of the debugger
+		if (this.config.breakOnFirstLine) {
+			const fileURI = vscode.Uri.file(info.file!);
+			const brekpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(info.line! + 1, 0)))
+			vscode.debug.addBreakpoints([brekpoint]);
+			vscode.debug.onDidTerminateDebugSession((session) => {
+				if (currentSession != session) { return; }
+				vscode.debug.removeBreakpoints([brekpoint]);
+			});
+		}
+
 		const promise = this.run(info,  [`--inspect-brk=${this.config.debuggerPort}`]);
 		if (!promise || !this.runningTestProcess) {
 			return;
@@ -185,7 +221,8 @@ export class JasmineAdapter implements TestAdapter {
 			stopOnEntry: false,
 		});
 
-		const currentSession = vscode.debug.activeDebugSession;
+		currentSession = vscode.debug.activeDebugSession;
+
 		// Kill the process to ensure we're good once the de
 		vscode.debug.onDidTerminateDebugSession((session) => {
 			if (currentSession != session) { return; }
@@ -196,7 +233,7 @@ export class JasmineAdapter implements TestAdapter {
 	}
 
 	private pipeProcess(process: ChildProcess) {
-		var customStream = new stream.Writable();
+		const customStream = new stream.Writable();
 		customStream._write = (data, encoding, callback) => {
 			this.channel.append(data.toString());
 			callback();
@@ -256,7 +293,7 @@ export class JasmineAdapter implements TestAdapter {
 
 		const processEnv = process.env;
 		const configEnv: { [prop: string]: any } = adapterConfig.get('env') || {};
-
+		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		const env = { ...processEnv };
 
 		for (const prop in configEnv) {
@@ -272,7 +309,7 @@ export class JasmineAdapter implements TestAdapter {
 			nodePath = this.getNodePath();
 		}
 
-		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath };
+		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath, breakOnFirstLine};
 	}
 
 	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
@@ -294,6 +331,7 @@ interface LoadedConfig {
 	debuggerPort: number;
 	nodePath: string | undefined;
 	env: { [prop: string]: any };
+	breakOnFirstLine: boolean;
 }
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {
