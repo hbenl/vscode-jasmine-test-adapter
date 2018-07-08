@@ -11,6 +11,7 @@ Run your Jasmine tests using the
 * Adds Gutter decorations to your test files showing the tests' state
 * Shows a failed test's log when the test is selected in the explorer
 * Lets you choose test suites or individual tests in the explorer that should be run automatically after each file change
+* Forwards the console output from Jasmine to a VS Code output channel
 
 ## Getting started
 * Install the extension
@@ -18,7 +19,6 @@ Run your Jasmine tests using the
 * Run / Debug your tests using the ![Run](img/run.png) / ![Debug](img/debug.png) icons in the Test Explorer or the CodeLenses in your test file
 
 ## Configuration
-
 * `jasmineExplorer.config`: The location of the Jasmine config file (relative to the workspace folder) (default: `spec/support/jasmine.json`)
 * `jasmineExplorer.env`: Environment variables to be set when running the tests
 * `jasmineExplorer.nodePath`: The path to the node executable to use. By default it will attempt to find it on your PATH, if it can't find it or if this option is set to `null`, it will use the one shipped with VS Code
