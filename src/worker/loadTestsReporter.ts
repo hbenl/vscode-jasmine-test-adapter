@@ -1,5 +1,5 @@
 import { TestSuiteInfo, TestInfo } from "vscode-test-adapter-api";
-import { Location } from "./loadTestsUtils";
+import { Location } from "./patchJasmine";
 
 export class LoadTestsReporter implements jasmine.CustomReporter {
 
@@ -13,7 +13,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	constructor(
 		private readonly done: (result: TestSuiteInfo) => void,
-		private readonly getLocations: () => {[id:string]: Location}
+		private readonly locations: Map<string, Location>
 	) {
 		this.rootSuite = {
 			type: 'suite',
@@ -42,19 +42,21 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 	}
 
 	suiteStarted(result: jasmine.CustomReporterResult): void {
-		const description = result.description;
-		const location = this.getLocations()[result.fullName];
-		
+
 		const suite: TestSuiteInfo = {
 			type: 'suite',
 			id: result.fullName,
-			label: description,
-			file: location.file,
-			line: location.line,
+			label: result.description,
 			children: []
 		};
 
-		this.processCurrentLocation(location);
+		const location = this.locations.get(result.id);
+		if (location) {
+			this.processCurrentLocation(location);
+			suite.file = location.file;
+			suite.line = location.line;
+		}
+
 		this.currentSuite.children.push(suite);
 		this.suiteStack.push(suite);
 	}
@@ -70,19 +72,20 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 			label: result.description
 		}
 
-		const location = this.getLocations()[test.id];
-		if (!location) {
-			console.log('Could not find location for spec', result.fullName);
-		} else {
+		const location = this.locations.get(result.id);
+		if (location) {
+			this.processCurrentLocation(location);
 			test.line = location.line,
 			test.file = location.file
+		} else {
+			console.log('Could not find location for spec', result.fullName);
 		}
-		this.processCurrentLocation(location);
+
 		this.currentSuite.children.push(test);
 	}
 
 	// This method will add a file suite if we changed
-	// The current file we're currenlty processing and push it 
+	// The current file we're currenlty processing and push it
 	// On to the stack
 	// It will also emit through this.done() the last file
 	// This way we emit one suite per file, which keeps things manageable
@@ -95,7 +98,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 			this.suiteStack.push(fileSuite);
 		}
 	}
-	
+
 	private emitLastSuite() {
 		if (!this.currentFile) { return; }
 		const doneSuite = this.suiteStack.pop();

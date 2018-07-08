@@ -1,14 +1,13 @@
 import Jasmine = require('jasmine');
 import { LoadTestsReporter } from './loadTestsReporter';
-import { patchJasmine } from './loadTestsUtils';
+import { patchJasmine } from './patchJasmine';
 
 const sendMessage = process.send ? (message: any) => process.send!(message) : () => {};
 const configFile = process.argv[2];
-// Allow for testing if needed by passing another argument
-const projectBaseDir = process.argv[3] || process.cwd();
 
-const _jasmine = new Jasmine({ projectBaseDir });
-_jasmine.loadConfigFile(configFile);
-const getter = patchJasmine(_jasmine);
-_jasmine.execute([], '$^');
-jasmine.getEnv().addReporter(new LoadTestsReporter(sendMessage, getter));
+const jasmine = new Jasmine({});
+const locations = patchJasmine(jasmine);
+jasmine.loadConfigFile(configFile);
+jasmine.env.addReporter(new LoadTestsReporter(sendMessage, locations));
+
+jasmine.execute(undefined, '$^');
