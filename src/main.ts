@@ -23,6 +23,7 @@ function getWorkspaceRegistrar(
 			if (adapter) {
 				testExplorerExtension.exports.unregisterAdapter(adapter);
 				registeredAdapters.delete(workspaceFolder);
+				adapter.dispose();
 			}
 		}
 	}

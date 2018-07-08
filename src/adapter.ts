@@ -8,7 +8,13 @@ import { parse as parseStackTrace } from 'stack-trace';
 import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo, TestDecoration } from 'vscode-test-adapter-api';
 import { detectNodePath } from 'vscode-test-adapter-util';
 
-export class JasmineAdapter implements TestAdapter {
+interface IDisposable {
+	dispose(): void;
+}
+
+export class JasmineAdapter implements TestAdapter, IDisposable {
+
+	private disposables: IDisposable[] = [];
 
 	private readonly testStatesEmitter = new vscode.EventEmitter<TestSuiteEvent | TestEvent>();
 	private readonly reloadEmitter = new vscode.EventEmitter<void>();
@@ -34,16 +40,21 @@ export class JasmineAdapter implements TestAdapter {
 		public readonly workspaceFolder: vscode.WorkspaceFolder,
 		public readonly channel: vscode.OutputChannel,
 	) {
-		vscode.workspace.onDidChangeConfiguration(configChange => {
+
+		this.disposables.push(this.testStatesEmitter);
+		this.disposables.push(this.reloadEmitter);
+		this.disposables.push(this.autorunEmitter);
+
+		this.disposables.push(vscode.workspace.onDidChangeConfiguration(configChange => {
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri)) {
 				this.config = undefined;
 				this.reloadEmitter.fire();
 			}
-		});
+		}));
 
-		vscode.workspace.onDidSaveTextDocument(document => {
+		this.disposables.push(vscode.workspace.onDidSaveTextDocument(document => {
 			if (!this.config) return;
 
 			const filename = document.uri.fsPath;
@@ -64,7 +75,7 @@ export class JasmineAdapter implements TestAdapter {
 			if (filename.startsWith(this.workspaceFolder.uri.fsPath)) {
 				this.autorunEmitter.fire();
 			}
-		});
+		}));
 	}
 
 	async load(): Promise<TestSuiteInfo | undefined> {
@@ -209,11 +220,12 @@ export class JasmineAdapter implements TestAdapter {
 		// Add a breakpoint on the 1st line of the debugger
 		if (this.config.breakOnFirstLine) {
 			const fileURI = vscode.Uri.file(info.file!);
-			const brekpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(info.line! + 1, 0)))
-			vscode.debug.addBreakpoints([brekpoint]);
-			vscode.debug.onDidTerminateDebugSession((session) => {
+			const breakpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(info.line! + 1, 0)));
+			vscode.debug.addBreakpoints([breakpoint]);
+			const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
 				if (currentSession != session) { return; }
-				vscode.debug.removeBreakpoints([brekpoint]);
+				vscode.debug.removeBreakpoints([breakpoint]);
+				subscription.dispose();
 			});
 		}
 
@@ -235,12 +247,27 @@ export class JasmineAdapter implements TestAdapter {
 		currentSession = vscode.debug.activeDebugSession;
 
 		// Kill the process to ensure we're good once the de
-		vscode.debug.onDidTerminateDebugSession((session) => {
+		const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
 			if (currentSession != session) { return; }
 			this.cancel(); // just ot be sure
+			subscription.dispose();
 		});
 
 		return promise;
+	}
+
+	cancel(): void {
+		if (this.runningTestProcess) {
+			this.runningTestProcess.kill();
+		}
+	}
+
+	dispose(): void {
+		this.cancel();
+		for (const disposable of this.disposables) {
+			disposable.dispose();
+		}
+		this.disposables = [];
 	}
 
 	private pipeProcess(process: ChildProcess) {
@@ -251,12 +278,6 @@ export class JasmineAdapter implements TestAdapter {
 		};
 		process.stderr.pipe(customStream);
 		process.stdout.pipe(customStream);
-	}
-
-	cancel(): void {
-		if (this.runningTestProcess) {
-			this.runningTestProcess.kill();
-		}
 	}
 
 	private async loadConfig(): Promise<LoadedConfig | undefined> {
