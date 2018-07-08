@@ -5,7 +5,8 @@ import * as fs from 'fs-extra';
 import * as os from 'os';
 import * as vscode from 'vscode';
 import { Minimatch, IMinimatch } from 'minimatch';
-import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo } from 'vscode-test-adapter-api';
+import { parse as parseStackTrace } from 'stack-trace';
+import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo, TestDecoration } from 'vscode-test-adapter-api';
 
 export class JasmineAdapter implements TestAdapter {
 
@@ -152,8 +153,12 @@ export class JasmineAdapter implements TestAdapter {
 		const config = this.config;
 		if (!config) return;
 
-		let tests: string[] = [];
-		this.collectTests(info, tests);
+		const testfiles = new Map<string, string>();
+		this.collectTestfiles(info, testfiles);
+		const tests: string[] = [];
+		for (const test of testfiles.keys()) {
+			tests.push(test);
+		}
 
 		const args = [ config.configFilePath ];
 		if (tests) {
@@ -178,9 +183,15 @@ export class JasmineAdapter implements TestAdapter {
 
 			this.pipeProcess(this.runningTestProcess);
 
-			this.runningTestProcess.on('message', 
-				event => this.testStatesEmitter.fire(<TestEvent>event)
-			);
+			this.runningTestProcess.on('message', (event: JasmineTestEvent) => {
+
+				if (event.failures) {
+					event.decorations = this.createDecorations(event, testfiles);
+					delete event.failures;
+				}
+
+				this.testStatesEmitter.fire(event);
+			});
 
 			this.runningTestProcess.on('exit', () => {
 				this.runningTestProcess = undefined;
@@ -312,14 +323,56 @@ export class JasmineAdapter implements TestAdapter {
 		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath, breakOnFirstLine};
 	}
 
-	private collectTests(info: TestSuiteInfo | TestInfo, tests: string[]): void {
+	private collectTestfiles(info: TestSuiteInfo | TestInfo, testfiles: Map<string, string>): void {
 		if (info.type === 'suite') {
 			for (const child of info.children) {
-				this.collectTests(child, tests);
+				this.collectTestfiles(child, testfiles);
 			}
 		} else {
-			tests.push(info.id);
+			if (info.file) {
+				testfiles.set(info.id, info.file);
+			}
 		}
+	}
+
+	private createDecorations(
+		event: JasmineTestEvent,
+		testfiles: Map<string, string>
+	): TestDecoration[] {
+
+		const testfile = testfiles.get(<string>event.test);
+		const decorations: TestDecoration[] = [];
+
+		if (testfile && event.failures) {
+			for (const failure of event.failures) {
+				const decoration = this.createDecoration(failure, testfile);
+				if (decoration) {
+					decorations.push(decoration);
+				}
+			}
+		}
+
+		return decorations;
+	}
+
+	private createDecoration(
+		failure: jasmine.FailedExpectation,
+		testfile: string
+	): TestDecoration | undefined {
+
+		const error: Error = { name: '', message: '', stack: failure.stack };
+		const stackFrames = parseStackTrace(error);
+
+		for (const stackFrame of stackFrames) {
+			if (stackFrame.getFileName() === testfile) {
+				return {
+					line: stackFrame.getLineNumber() - 1,
+					message: failure.message
+				}
+			}
+		}
+
+		return undefined;
 	}
 }
 
@@ -336,4 +389,8 @@ interface LoadedConfig {
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {
 	isFileSuite?: boolean;
+}
+
+export interface JasmineTestEvent extends TestEvent {
+	failures?: jasmine.FailedExpectation[] | undefined
 }

@@ -1,4 +1,4 @@
-import { TestEvent } from 'vscode-test-adapter-api';
+import { JasmineTestEvent } from '../adapter';
 
 export class RunTestsReporter implements jasmine.CustomReporter {
 
@@ -12,7 +12,7 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 		if ((this.testsToReport === undefined) ||
 			(this.testsToReport.indexOf(result.fullName) >= 0)) {
 
-			const event: TestEvent = {
+			const event: JasmineTestEvent = {
 				type: 'test',
 				test: result.fullName,
 				state: 'running'
@@ -32,23 +32,19 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 			}
 
 			const state = convertTestState(result.status);
-			const event: TestEvent = {
+			const event: JasmineTestEvent = {
 				type: 'test',
 				test: result.fullName,
 				state: convertTestState(result.status),
 				message,
 			}
 			if (state === 'failed') {
-				(event as FailedTestEvent).failures = result.failedExpectations
+				event.failures = result.failedExpectations
 			}
 
 			this.sendMessage(event);
 		}
 	}
-}
-
-interface FailedTestEvent extends TestEvent {
-	failures: jasmine.FailedExpectation[] | undefined
 }
 
 function convertTestState(jasmineState: string | undefined): 'passed' | 'failed' | 'skipped' {

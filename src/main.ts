@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
-import { TestExplorerExtension, testExplorerExtensionId, TestEvent } from 'vscode-test-adapter-api';
+import { TestExplorerExtension, testExplorerExtensionId } from 'vscode-test-adapter-api';
 import { JasmineAdapter } from './adapter';
-import { TestDecorationsManager } from './decorationsManager';
 
 function getWorkspaceRegistrar(
 	testExplorerExtension:vscode.Extension<TestExplorerExtension>,
@@ -13,10 +12,6 @@ function getWorkspaceRegistrar(
 	function add(workspaces: vscode.WorkspaceFolder[]) {
 		for (const workspaceFolder of workspaces) {
 			const adapter = new JasmineAdapter(workspaceFolder, channel);
-			const manager = new TestDecorationsManager(workspaceFolder.uri.fsPath, context);
-			adapter.testStates((event) => 
-				manager.handle(event as TestEvent)
-			, null, context.subscriptions);
 			registeredAdapters.set(workspaceFolder, adapter);
 			testExplorerExtension.exports.registerAdapter(adapter);
 		}
