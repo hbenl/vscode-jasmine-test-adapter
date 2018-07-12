@@ -45,7 +45,7 @@
     "stack-trace": "0.0.10",
     "tslib": "^1.9.3",
     "vscode-test-adapter-api": "^0.4.0",
-    "vscode-test-adapter-util": "^0.3.0"
+    "vscode-test-adapter-util": "^0.4.0"
   },
   "devDependencies": {
     "@types/escape-string-regexp": "0.0.32",
@@ -54,7 +54,7 @@
     "@types/minimatch": "^3.0.3",
     "@types/stack-trace": "0.0.29",
     "typescript": "^2.9.2",
-    "vsce": "^1.43.0",
+    "vsce": "^1.44.0",
     "vscode": "^1.1.18"
   },
   "engines": {
