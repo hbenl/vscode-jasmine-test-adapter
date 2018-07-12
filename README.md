@@ -28,3 +28,13 @@ Run your Jasmine tests using the
 * `testExplorer.gutterDecoration`: Show the state of each test in the editor using Gutter Decorations
 * `testExplorer.onStart`: Retire or reset all test states whenever a test run is started
 * `testExplorer.onReload`: Retire or reset all test states whenever the test tree is reloaded
+
+## Troubleshooting
+All console output from Jasmine is forwarded to a VS Code output channel called "Jasmine Tests", this is often useful in tracking down problems.
+
+If the "Jasmine Tests" output channel doesn't show up, the Test view doesn't show your tests or anything else doesn't work as expected (and can't be explained from Jasmine's console output), you can turn on diagnostic logging using one of the following configuration options
+(note: in multi-root workspaces, these options are always taken from the first workspace folder):
+* `jasmineExplorer.logpanel`: Write diagnotic logs to an output panel called "Jasmine Explorer Log"
+* `jasmineExplorer.logfile`: Write diagnostic logs to the given file
+
+If you think you've found a bug, please [file a bug report](https://github.com/hbenl/vscode-jasmine-test-adapter/issues) and attach the diagnostic logs.
