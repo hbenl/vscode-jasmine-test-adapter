@@ -86,10 +86,6 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const config = this.config;
 		if (!config) return undefined;
 
-		if (config.testFiles.length === 0) {
-			return undefined;
-		}
-
 		const rootSuite: TestSuiteInfo = {
 			type: 'suite',
 			id: 'root',
@@ -298,17 +294,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const specDir = path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir);
 
 		const testFileGlobs: IMinimatch[] = [];
-		const testFiles: string[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
-
 			const absoluteGlob = path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir, relativeGlob);
 			testFileGlobs.push(new Minimatch(absoluteGlob));
-
-			const workspaceRelativeGlob = jasmineConfig.spec_dir + '/' + relativeGlob;
-			const relativePattern = new vscode.RelativePattern(this.workspaceFolder, workspaceRelativeGlob);
-			const fileUris = await vscode.workspace.findFiles(relativePattern);
-			const files = fileUris.map(uri => uri.fsPath);
-			testFiles.push(...files);
 		}
 
 		const processEnv = process.env;
@@ -329,7 +317,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			nodePath = await detectNodePath();
 		}
 
-		return { configFilePath, specDir, testFileGlobs, testFiles, env, debuggerPort, nodePath, breakOnFirstLine};
+		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, breakOnFirstLine};
 	}
 
 	private collectTestfiles(info: TestSuiteInfo | TestInfo, testfiles: Map<string, string>): void {
@@ -389,7 +377,6 @@ interface LoadedConfig {
 	configFilePath: string;
 	specDir: string;
 	testFileGlobs: IMinimatch[];
-	testFiles: string[];
 	debuggerPort: number;
 	nodePath: string | undefined;
 	env: { [prop: string]: any };
