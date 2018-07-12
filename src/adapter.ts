@@ -108,7 +108,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const suites: {[id: string]: TestSuiteInfo} = {};
 
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
-			const args = [ config.configFilePath ];
+			const args = [ config.configFilePath, JSON.stringify(this.log.enabled) ];
 			const childProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
@@ -127,14 +127,22 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			// When running in random order, the same file may have multiple suites emitted
 			// This way the only thing we need to do is just to replace the name
 			// With a shorter one
-			childProcess.on('message', (msg) => {
-				if (this.log.enabled) this.log.info(`Received tests for ${msg.file} from worker`);
-				msg.label = msg.file.replace(config.specDir, '');
-				const file = msg.file;
-				if (suites[file]) {
-					suites[file].children = suites[file].children.concat(msg.children);
+			childProcess.on('message', (message: string | JasmineTestSuiteInfo) => {
+
+				if (typeof message === 'string') {
+
+					this.log.info(`Worker: ${message}`);
+
 				} else {
-					suites[file] = msg;
+
+					if (this.log.enabled) this.log.info(`Received tests for ${message.file} from worker`);
+					message.label = message.file!.replace(config.specDir, '');
+					const file = message.file!;
+					if (suites[file]) {
+						suites[file].children = suites[file].children.concat(message.children);
+					} else {
+						suites[file] = message;
+					}
 				}
 			});
 
@@ -183,7 +191,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			tests.push(test);
 		}
 
-		const args = [ config.configFilePath ];
+		const args = [ config.configFilePath, JSON.stringify(this.log.enabled) ];
 		if (tests) {
 			args.push(JSON.stringify(tests));
 			if (info.file) {
@@ -206,15 +214,23 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 			this.pipeProcess(this.runningTestProcess);
 
-			this.runningTestProcess.on('message', (event: JasmineTestEvent) => {
-				if (this.log.enabled) this.log.info(`Received ${JSON.stringify(event)}`);
+			this.runningTestProcess.on('message', (message: string | JasmineTestEvent) => {
 
-				if (event.failures) {
-					event.decorations = this.createDecorations(event, testfiles);
-					delete event.failures;
+				if (typeof message === 'string') {
+
+					this.log.info(`Worker: ${message}`);
+
+				} else {
+
+					if (this.log.enabled) this.log.info(`Received ${JSON.stringify(message)}`);
+
+					if (message.failures) {
+						message.decorations = this.createDecorations(message, testfiles);
+						delete message.failures;
+					}
+	
+					this.testStatesEmitter.fire(message);
 				}
-
-				this.testStatesEmitter.fire(event);
 			});
 
 			this.runningTestProcess.on('exit', () => {

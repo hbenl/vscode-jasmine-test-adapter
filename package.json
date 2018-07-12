@@ -103,6 +103,16 @@
           "type": "boolean",
           "default": false,
           "scope": "resource"
+        },
+        "jasmineExplorer.logpanel": {
+          "description": "write diagnotic logs to an output panel",
+          "type": "boolean",
+          "scope": "resource"
+        },
+        "jasmineExplorer.logfile": {
+          "description": "write diagnostic logs to the given file",
+          "type": "string",
+          "scope": "resource"
         }
       }
     }

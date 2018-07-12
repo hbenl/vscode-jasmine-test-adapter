@@ -4,22 +4,35 @@ import { RunTestsReporter } from './runTestsReporter';
 
 const sendMessage = process.send ? (message: any) => process.send!(message) : () => {};
 
-let testsToRun: string[] | undefined;
-let testFiles = [];
+let logEnabled = false;
+try {
 
-const argv = process.argv;
-const configFile = argv[2];
+	let testsToRun: string[] | undefined;
+	let testFiles = [];
 
-if (argv.length > 3) {
-	testsToRun = JSON.parse(argv[3]);
+	const argv = process.argv;
+	const configFile = argv[2];
+	logEnabled = <boolean>JSON.parse(argv[3]);
+
+	if (argv.length > 4) {
+		testsToRun = JSON.parse(argv[4]);
+	}
+
+	if (argv.length > 5) {
+		testFiles.push(argv[5]);
+	}
+
+	const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
+	const jasmine = new Jasmine({ baseProjectPath: process.cwd });
+	if (logEnabled) sendMessage('Loading config file');
+	jasmine.loadConfigFile(configFile);
+	if (logEnabled) sendMessage('Creating and adding reporter');
+	jasmine.env.addReporter(new RunTestsReporter(sendMessage, testsToRun));
+
+	if (logEnabled) sendMessage('Executing Jasmine');
+	jasmine.execute(testFiles, regExp);
+
+} catch (err) {
+	if (logEnabled) sendMessage(`Caught error ${JSON.stringify(err)}`);
+	throw err;
 }
-
-if (argv.length > 4) {
-	testFiles.push(argv[4]);
-}
-
-const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
-const _jasmine = new Jasmine({ baseProjectPath: process.cwd });
-_jasmine.loadConfigFile(configFile);
-_jasmine.execute(testFiles, regExp);
-jasmine.getEnv().addReporter(new RunTestsReporter(sendMessage, testsToRun));
