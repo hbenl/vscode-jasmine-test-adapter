@@ -26,11 +26,16 @@ try {
 	const jasmine = new Jasmine({ baseProjectPath: process.cwd });
 	if (logEnabled) sendMessage('Loading config file');
 	jasmine.loadConfigFile(configFile);
-	if (logEnabled) sendMessage('Creating and adding reporter');
-	jasmine.env.addReporter(new RunTestsReporter(sendMessage, testsToRun));
 
 	if (logEnabled) sendMessage('Executing Jasmine');
 	jasmine.execute(testFiles, regExp);
+
+	// The reporter must be added after the call to jasmine.execute() because otherwise
+	// it would be removed if the user changes the reporter in the helper files. 
+	// Note that jasmine will start the tests asynchronously, so the reporter will still
+	// be added before the tests are run.
+	if (logEnabled) sendMessage('Creating and adding reporter');
+	jasmine.env.addReporter(new RunTestsReporter(sendMessage, testsToRun));
 
 } catch (err) {
 	if (logEnabled) sendMessage(`Caught error ${JSON.stringify(err)}`);
