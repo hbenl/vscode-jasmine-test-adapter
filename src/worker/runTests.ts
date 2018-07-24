@@ -1,6 +1,7 @@
 import Jasmine = require('jasmine');
 import * as RegExEscape from 'escape-string-regexp';
 import { RunTestsReporter } from './runTestsReporter';
+import { copyOwnProperties } from '../util';
 
 const sendMessage = process.send ? (message: any) => process.send!(message) : () => {};
 
@@ -38,6 +39,6 @@ try {
 	jasmine.env.addReporter(new RunTestsReporter(sendMessage, testsToRun));
 
 } catch (err) {
-	if (logEnabled) sendMessage(`Caught error ${JSON.stringify(err)}`);
+	if (logEnabled) sendMessage(`Caught error ${JSON.stringify(copyOwnProperties(err))}`);
 	throw err;
 }
