@@ -69,7 +69,8 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 		const test: TestInfo = {
 			type: 'test',
 			id: result.fullName,
-			label: result.description
+			label: result.description,
+			skipped: !!result.pendingReason
 		}
 
 		const location = this.locations.get(result.id);
