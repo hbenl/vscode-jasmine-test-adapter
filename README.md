@@ -1,6 +1,6 @@
 # Jasmine Test Explorer for Visual Studio Code
 
-Run your Jasmine tests using the 
+Run your Jasmine tests in Node using the 
 [Test Explorer UI](https://marketplace.visualstudio.com/items?itemName=hbenl.vscode-test-explorer).
 
 ![Screenshot](img/screenshot.png)
@@ -53,5 +53,8 @@ If the "Jasmine Tests" output channel doesn't show up, the Test view doesn't sho
 (note: in multi-root workspaces, these options are always taken from the first workspace folder):
 * `jasmineExplorer.logpanel`: Write diagnotic logs to an output panel called "Jasmine Explorer Log"
 * `jasmineExplorer.logfile`: Write diagnostic logs to the given file
+
+There is a [bug in Node >= 10.6](https://github.com/nodejs/node/issues/21671) that breaks this adapter.
+If you're using a version of Node affected by this bug, add `"mochaExplorer.nodePath": null` to your configuration as a workaround.
 
 If you think you've found a bug, please [file a bug report](https://github.com/hbenl/vscode-jasmine-test-adapter/issues) and attach the diagnostic logs.
