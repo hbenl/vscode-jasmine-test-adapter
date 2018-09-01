@@ -9,6 +9,7 @@ Run your Jasmine tests in Node using the
 * Shows a Test Explorer in the Test view in VS Code's sidebar with all detected tests and suites and their state
 * Adds CodeLenses to your test files for starting and debugging tests
 * Adds Gutter decorations to your test files showing the tests' state
+* Adds line decorations to the source line where a test failed
 * Shows a failed test's log when the test is selected in the explorer
 * Lets you choose test suites or individual tests in the explorer that should be run automatically after each file change
 * Forwards the console output from Jasmine to a VS Code output channel
@@ -55,6 +56,6 @@ If the "Jasmine Tests" output channel doesn't show up, the Test view doesn't sho
 * `jasmineExplorer.logfile`: Write diagnostic logs to the given file
 
 There is a [bug in Node >= 10.6](https://github.com/nodejs/node/issues/21671) that breaks this adapter.
-If you're using a version of Node affected by this bug, add `"mochaExplorer.nodePath": null` to your configuration as a workaround.
+If you're using a version of Node affected by this bug, add `"jasmineExplorer.nodePath": null` to your configuration as a workaround.
 
 If you think you've found a bug, please [file a bug report](https://github.com/hbenl/vscode-jasmine-test-adapter/issues) and attach the diagnostic logs.
