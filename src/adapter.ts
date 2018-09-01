@@ -5,7 +5,7 @@ import * as fs from 'fs-extra';
 import * as vscode from 'vscode';
 import { Minimatch, IMinimatch } from 'minimatch';
 import { parse as parseStackTrace } from 'stack-trace';
-import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo, TestDecoration } from 'vscode-test-adapter-api';
+import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo, TestDecoration, TestLoadStartedEvent, TestLoadFinishedEvent, TestRunStartedEvent, TestRunFinishedEvent } from 'vscode-test-adapter-api';
 import { Log, detectNodePath } from 'vscode-test-adapter-util';
 
 interface IDisposable {
@@ -16,20 +16,21 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 	private disposables: IDisposable[] = [];
 
-	private readonly testStatesEmitter = new vscode.EventEmitter<TestSuiteEvent | TestEvent>();
-	private readonly reloadEmitter = new vscode.EventEmitter<void>();
+	private readonly testsEmitter = new vscode.EventEmitter<TestLoadStartedEvent | TestLoadFinishedEvent>();
+	private readonly testStatesEmitter = new vscode.EventEmitter<TestRunStartedEvent | TestRunFinishedEvent | TestSuiteEvent | TestEvent>();
 	private readonly autorunEmitter = new vscode.EventEmitter<void>();
 
 	private config?: LoadedConfig;
+	private nodesById = new Map<string, TestSuiteInfo | TestInfo>();
 
 	private runningTestProcess: ChildProcess | undefined;
 
-	get testStates(): vscode.Event<TestSuiteEvent | TestEvent> {
-		return this.testStatesEmitter.event;
+	get tests(): vscode.Event<TestLoadStartedEvent | TestLoadFinishedEvent> {
+		return this.testsEmitter.event;
 	}
 
-	get reload(): vscode.Event<void> {
-		return this.reloadEmitter.event;
+	get testStates(): vscode.Event<TestRunStartedEvent | TestRunFinishedEvent | TestSuiteEvent | TestEvent> {
+		return this.testStatesEmitter.event;
 	}
 
 	get autorun(): vscode.Event<void> {
@@ -42,8 +43,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		private readonly log: Log
 	) {
 
+		this.disposables.push(this.testsEmitter);
 		this.disposables.push(this.testStatesEmitter);
-		this.disposables.push(this.reloadEmitter);
 		this.disposables.push(this.autorunEmitter);
 
 		this.disposables.push(vscode.workspace.onDidChangeConfiguration(configChange => {
@@ -56,7 +57,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 				this.log.info('Sending reload event');
 				this.config = undefined;
-				this.reloadEmitter.fire();
+				this.load();
 			}
 		}));
 
@@ -69,14 +70,14 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			if (filename === this.config.configFilePath) {
 				this.log.info('Sending reload event');
 				this.config = undefined;
-				this.reloadEmitter.fire();
+				this.load();
 				return;
 			}
 
 			for (const glob of this.config.testFileGlobs) {
 				if (glob.match(filename)) {
 					if (this.log.enabled) this.log.info(`Sending reload event because ${filename} is a test file`);
-					this.reloadEmitter.fire();
+					this.load();
 					return;
 				}
 			}
@@ -88,13 +89,18 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}));
 	}
 
-	async load(): Promise<TestSuiteInfo | undefined> {
+	async load(): Promise<void> {
+
+		this.testsEmitter.fire(<TestLoadStartedEvent>{ type: 'started' });
 
 		if (!this.config) {
 			this.config = await this.loadConfig();
 		}
 		const config = this.config;
-		if (!config) return undefined;
+		if (!config) {
+			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: undefined });
+			return;
+		}
 
 		if (this.log.enabled) this.log.info(`Loading test files of ${this.workspaceFolder.uri.fsPath}`);
 
@@ -170,22 +176,33 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			rootSuite.children.push(sort(suites[file]));
 		});
 
+		this.nodesById.clear();
+		this.collectNodesById(rootSuite);
+
 		if (rootSuite.children.length > 0) {
-			return rootSuite;
+			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: rootSuite });
 		} else {
-			return undefined;
+			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: undefined });
 		}
 	}
 
-	async run(info: JasmineTestSuiteInfo | TestInfo, execArgv: string[] = []): Promise<void> {
+	async run(testsToRun: string[], execArgv: string[] = []): Promise<void> {
 
 		const config = this.config;
 		if (!config) return;
 
-		if (this.log.enabled) this.log.info(`Running test(s) "${info.id}" of ${this.workspaceFolder.uri.fsPath}`);
+		if (this.log.enabled) this.log.info(`Running test(s) ${JSON.stringify(testsToRun)} of ${this.workspaceFolder.uri.fsPath}`);
+
+		this.testStatesEmitter.fire(<TestRunStartedEvent>{ type: 'started', tests: testsToRun });
 
 		const testfiles = new Map<string, string>();
-		this.collectTestfiles(info, testfiles);
+		for (const suiteOrTestId of testsToRun) {
+			const node = this.nodesById.get(suiteOrTestId);
+			if (node) {
+				this.collectTestfiles(node, testfiles);
+			}
+		}
+
 		const tests: string[] = [];
 		for (const test of testfiles.keys()) {
 			tests.push(test);
@@ -194,9 +211,6 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const args = [ config.configFilePath, JSON.stringify(this.log.enabled) ];
 		if (tests) {
 			args.push(JSON.stringify(tests));
-			if (info.file) {
-				args.push(info.file);
-			}
 		}
 
 		return new Promise<void>((resolve) => {
@@ -236,32 +250,36 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			this.runningTestProcess.on('exit', () => {
 				this.log.info('Worker finished');
 				this.runningTestProcess = undefined;
+				this.testStatesEmitter.fire(<TestRunFinishedEvent>{ type: 'finished' });
 				resolve();
 			});
 		});
 	}
 
-	async debug(info: JasmineTestSuiteInfo | TestInfo): Promise<void> {
-		if (!this.config) {
+	async debug(testsToRun: string[]): Promise<void> {
+		if (!this.config || (testsToRun.length === 0)) {
 			return;
 		}
 
-		if (this.log.enabled) this.log.info(`Debugging test(s) "${info.id}" of ${this.workspaceFolder.uri.fsPath}`);
+		if (this.log.enabled) this.log.info(`Debugging test(s) ${JSON.stringify(testsToRun)} of ${this.workspaceFolder.uri.fsPath}`);
 
 		let currentSession: vscode.DebugSession | undefined; 
 		// Add a breakpoint on the 1st line of the debugger
 		if (this.config.breakOnFirstLine) {
-			const fileURI = vscode.Uri.file(info.file!);
-			const breakpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(info.line! + 1, 0)));
-			vscode.debug.addBreakpoints([breakpoint]);
-			const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
-				if (currentSession != session) { return; }
-				vscode.debug.removeBreakpoints([breakpoint]);
-				subscription.dispose();
-			});
+			const node = this.nodesById.get(testsToRun[0]);
+			if (node && node.file && node.line) {
+				const fileURI = vscode.Uri.file(node.file);
+				const breakpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(node.line + 1, 0)));
+				vscode.debug.addBreakpoints([breakpoint]);
+				const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
+					if (currentSession != session) { return; }
+					vscode.debug.removeBreakpoints([breakpoint]);
+					subscription.dispose();
+				});
+			}
 		}
 
-		const promise = this.run(info,  [`--inspect-brk=${this.config.debuggerPort}`]);
+		const promise = this.run(testsToRun,  [`--inspect-brk=${this.config.debuggerPort}`]);
 		if (!promise || !this.runningTestProcess) {
 			this.log.error('Starting the worker failed');
 			return;
@@ -309,6 +327,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			disposable.dispose();
 		}
 		this.disposables = [];
+		this.nodesById.clear();
 	}
 
 	private pipeProcess(process: ChildProcess) {
@@ -372,6 +391,15 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
 		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, breakOnFirstLine};
+	}
+
+	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
+		this.nodesById.set(info.id, info);
+		if (info.type === 'suite') {
+			for (const child of info.children) {
+				this.collectNodesById(child);
+			}
+		}
 	}
 
 	private collectTestfiles(info: TestSuiteInfo | TestInfo, testfiles: Map<string, string>): void {

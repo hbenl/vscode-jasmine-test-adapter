@@ -9,7 +9,6 @@ let logEnabled = false;
 try {
 
 	let testsToRun: string[] | undefined;
-	let testFiles = [];
 
 	const argv = process.argv;
 	const configFile = argv[2];
@@ -19,17 +18,13 @@ try {
 		testsToRun = JSON.parse(argv[4]);
 	}
 
-	if (argv.length > 5) {
-		testFiles.push(argv[5]);
-	}
-
 	const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
 	const jasmine = new Jasmine({ baseProjectPath: process.cwd });
 	if (logEnabled) sendMessage('Loading config file');
 	jasmine.loadConfigFile(configFile);
 
 	if (logEnabled) sendMessage('Executing Jasmine');
-	jasmine.execute(testFiles, regExp);
+	jasmine.execute(undefined, regExp);
 
 	// The reporter must be added after the call to jasmine.execute() because otherwise
 	// it would be removed if the user changes the reporter in the helper files. 

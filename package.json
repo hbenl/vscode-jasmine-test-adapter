@@ -39,23 +39,23 @@
   ],
   "dependencies": {
     "escape-string-regexp": "^1.0.5",
-    "fs-extra": "^6.0.1",
-    "jasmine": "^3.1.0",
+    "fs-extra": "^7.0.0",
+    "jasmine": "^3.2.0",
     "minimatch": "^3.0.4",
     "stack-trace": "0.0.10",
     "tslib": "^1.9.3",
-    "vscode-test-adapter-api": "^0.4.0",
-    "vscode-test-adapter-util": "^0.4.2"
+    "vscode-test-adapter-api": "^1.0.1",
+    "vscode-test-adapter-util": "^0.5.0"
   },
   "devDependencies": {
-    "@types/escape-string-regexp": "0.0.32",
+    "@types/escape-string-regexp": "1.0.0",
     "@types/fs-extra": "^5.0.4",
     "@types/jasmine": "^2.8.8",
     "@types/minimatch": "^3.0.3",
     "@types/stack-trace": "0.0.29",
-    "typescript": "^2.9.2",
-    "vsce": "^1.44.0",
-    "vscode": "^1.1.18"
+    "typescript": "^3.0.3",
+    "vsce": "^1.47.0",
+    "vscode": "^1.1.21"
   },
   "engines": {
     "vscode": "^1.23.0"
