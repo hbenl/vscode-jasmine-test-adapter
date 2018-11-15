@@ -133,7 +133,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv: ["--require", "ts-node/register"],
+					execArgv: config.nodeArgv || [],
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
@@ -232,7 +232,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv: (execArgv || []).concat(["--require", "ts-node/register"]),
+					execArgv: config.nodeArgv || [],
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
@@ -396,12 +396,15 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 		if (this.log.enabled) this.log.debug(`Using nodePath: ${nodePath}`);
 
+		let nodeArgv: string[] | undefined = adapterConfig.get<string[]>('nodeArgv') || [];
+		if (this.log.enabled) this.log.debug(`Using node arguments: ${nodeArgv}`);
+
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
 
 		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
-		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, breakOnFirstLine };
+		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, nodeArgv, breakOnFirstLine };
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -478,6 +481,7 @@ interface LoadedConfig {
 	testFileGlobs: IMinimatch[];
 	debuggerPort: number;
 	nodePath: string | undefined;
+	nodeArgv: string[];
 	env: { [prop: string]: any };
 	breakOnFirstLine: boolean;
 }
