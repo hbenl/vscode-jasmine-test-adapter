@@ -28,7 +28,7 @@ Property                           | Description
 `jasmineExplorer.config`           | The location of the Jasmine config file (relative to the workspace folder) (default: `spec/support/jasmine.json`)
 `jasmineExplorer.env`              | Environment variables to be set when running the tests
 `jasmineExplorer.nodePath`         | The path to the node executable to use. By default it will attempt to find it on your PATH, if it can't find it or if this option is set to `null`, it will use the one shipped with VS Code
-`jasmineExplorer.nodArgv`          | The arguments to the node executable to use.  To enable automatic typescript, import ts-node package and use these arguments: [\"--require\", \"ts-node/register\"]
+`jasmineExplorer.nodeArgv`          | The arguments to the node executable to use.  To enable automatic typescript, import ts-node package and use these arguments: [\"--require\", \"ts-node/register\"]
 `jasmineExplorer.debuggerPort`     | The port for running the debug sessions (default: `9229`)
 `jasmineExplorer.breakOnFirstLine` | Setting to `true` injects a breakpoint at the first line of your test, (default: `false`)
 `testExplorer.codeLens`            | Show a CodeLens above each test or suite for running or debugging the tests
