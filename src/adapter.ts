@@ -6,16 +6,16 @@ import { parse as parseStackTrace } from 'stack-trace';
 import * as stream from 'stream';
 import * as vscode from 'vscode';
 import {
-    TestAdapter,
-    TestDecoration,
-    TestEvent,
-    TestInfo,
-    TestLoadFinishedEvent,
-    TestLoadStartedEvent,
-    TestRunFinishedEvent,
-    TestRunStartedEvent,
-    TestSuiteEvent,
-    TestSuiteInfo,
+	TestAdapter,
+	TestDecoration,
+	TestEvent,
+	TestInfo,
+	TestLoadFinishedEvent,
+	TestLoadStartedEvent,
+	TestRunFinishedEvent,
+	TestRunStartedEvent,
+	TestSuiteEvent,
+	TestSuiteInfo,
 } from 'vscode-test-adapter-api';
 import { detectNodePath, Log } from 'vscode-test-adapter-util';
 
@@ -133,7 +133,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv: config.nodeArgv || [],
+					execArgv: config.nodeArgv,
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
@@ -232,7 +232,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv: config.nodeArgv || [],
+					execArgv: config.nodeArgv,
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
@@ -396,7 +396,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 		if (this.log.enabled) this.log.debug(`Using nodePath: ${nodePath}`);
 
-		let nodeArgv: string[] | undefined = adapterConfig.get<string[]>('nodeArgv') || [];
+		let nodeArgv: string[] = adapterConfig.get<string[]>('nodeArgv') || [];
 		if (this.log.enabled) this.log.debug(`Using node arguments: ${nodeArgv}`);
 
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
