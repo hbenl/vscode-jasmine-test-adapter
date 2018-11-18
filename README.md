@@ -25,6 +25,7 @@ This is equivalent to running Jasmine with the command line
 ```
 node -r ts-node/register ./node_modules/.bin/jasmine
 ```
+Note that breakpoints may not work initially (this is a known limitation when debugging with `ts-node` in VS Code), so you may have to use `debugger` statements instead.
 
 ## Configuration
 
