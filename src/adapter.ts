@@ -239,7 +239,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv: config.nodeArgv,
+					execArgv: execArgv.concat(config.nodeArgv),
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
