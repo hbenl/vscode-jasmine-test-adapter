@@ -58,17 +58,24 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		this.disposables.push(this.testStatesEmitter);
 		this.disposables.push(this.autorunEmitter);
 
-		this.disposables.push(vscode.workspace.onDidChangeConfiguration(configChange => {
+		this.disposables.push(vscode.workspace.onDidChangeConfiguration(async configChange => {
 
 			this.log.info('Configuration changed');
 
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
-				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri)) {
+				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.nodeArgv', this.workspaceFolder.uri)) {
 
 				this.log.info('Sending reload event');
 				this.config = undefined;
 				this.load();
+
+			} else if (
+				configChange.affectsConfiguration('jasmineExplorer.debuggerPort', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.breakOnFirstLine', this.workspaceFolder.uri)) {
+
+				this.config = await this.loadConfig();
 			}
 		}));
 
