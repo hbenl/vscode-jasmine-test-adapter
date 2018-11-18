@@ -19,16 +19,23 @@ Run your Jasmine tests in Node using the
 * Restart VS Code and open the Test view
 * Run / Debug your tests using the ![Run](img/run.png) / ![Debug](img/debug.png) icons in the Test Explorer or the CodeLenses in your test file
 
+## Typescript support
+If your tests are written in Typescript, install the `ts-node` npm package (if you haven't done so already) and set the `jasmineExplorer.nodeArgv` configuration property to `["-r", "ts-node/register"]`.
+This is equivalent to running Jasmine with the command line 
+```
+node -r ts-node/register ./node_modules/.bin/jasmine
+```
+
 ## Configuration
 
 The following configuration properties are available:
 
 Property                           | Description
 -----------------------------------|---------------------------------------------------------------
-`jasmineExplorer.config`           | The location of the Jasmine config file (relative to the workspace folder) (default: `spec/support/jasmine.json`)
+`jasmineExplorer.config`           | The location of the Jasmine config file (relative to the workspace folder) (default: `"spec/support/jasmine.json"`)
 `jasmineExplorer.env`              | Environment variables to be set when running the tests
 `jasmineExplorer.nodePath`         | The path to the node executable to use. By default it will attempt to find it on your PATH, if it can't find it or if this option is set to `null`, it will use the one shipped with VS Code
-`jasmineExplorer.nodeArgv`          | The arguments to the node executable to use.  To enable automatic typescript, import ts-node package and use these arguments: [\"--require\", \"ts-node/register\"]
+`jasmineExplorer.nodeArgv`         | The arguments to the node executable to use
 `jasmineExplorer.debuggerPort`     | The port for running the debug sessions (default: `9229`)
 `jasmineExplorer.breakOnFirstLine` | Setting to `true` injects a breakpoint at the first line of your test, (default: `false`)
 `testExplorer.codeLens`            | Show a CodeLens above each test or suite for running or debugging the tests
