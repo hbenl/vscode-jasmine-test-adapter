@@ -39,22 +39,22 @@
   ],
   "dependencies": {
     "escape-string-regexp": "^1.0.5",
-    "fs-extra": "^7.0.0",
-    "jasmine": "^3.2.0",
+    "fs-extra": "^7.0.1",
+    "jasmine": "^3.3.0",
     "minimatch": "^3.0.4",
     "stack-trace": "0.0.10",
     "tslib": "^1.9.3",
-    "vscode-test-adapter-api": "^1.0.1",
-    "vscode-test-adapter-util": "^0.5.0"
+    "vscode-test-adapter-api": "^1.1.0",
+    "vscode-test-adapter-util": "^0.5.1"
   },
   "devDependencies": {
     "@types/escape-string-regexp": "1.0.0",
     "@types/fs-extra": "^5.0.4",
-    "@types/jasmine": "^2.8.8",
+    "@types/jasmine": "^3.0.0",
     "@types/minimatch": "^3.0.3",
     "@types/stack-trace": "0.0.29",
-    "typescript": "^3.0.3",
-    "vsce": "^1.47.0",
+    "typescript": "^3.1.6",
+    "vsce": "^1.53.0",
     "vscode": "^1.1.21"
   },
   "engines": {
@@ -99,7 +99,7 @@
           "scope": "resource"
         },
         "jasmineExplorer.nodeArgv": {
-          "description": "The arguments to the node executable to use.  To enable automatic typescript, import ts-node package and use these arguments: [\"--require\", \"ts-node/register\"]",
+          "description": "The arguments to the node executable to use. To enable typescript support, install the ts-node npm package and set this property to [\"-r\", \"ts-node/register\"]",
           "type": "array",
           "items": {
             "type": "string"
