@@ -1,12 +1,23 @@
-import * as path from 'path';
 import { ChildProcess, fork } from 'child_process';
-import * as stream from 'stream';
 import * as fs from 'fs-extra';
-import * as vscode from 'vscode';
-import { Minimatch, IMinimatch } from 'minimatch';
+import { IMinimatch, Minimatch } from 'minimatch';
+import * as path from 'path';
 import { parse as parseStackTrace } from 'stack-trace';
-import { TestAdapter, TestSuiteEvent, TestEvent, TestSuiteInfo, TestInfo, TestDecoration, TestLoadStartedEvent, TestLoadFinishedEvent, TestRunStartedEvent, TestRunFinishedEvent } from 'vscode-test-adapter-api';
-import { Log, detectNodePath } from 'vscode-test-adapter-util';
+import * as stream from 'stream';
+import * as vscode from 'vscode';
+import {
+	TestAdapter,
+	TestDecoration,
+	TestEvent,
+	TestInfo,
+	TestLoadFinishedEvent,
+	TestLoadStartedEvent,
+	TestRunFinishedEvent,
+	TestRunStartedEvent,
+	TestSuiteEvent,
+	TestSuiteInfo,
+} from 'vscode-test-adapter-api';
+import { detectNodePath, Log } from 'vscode-test-adapter-util';
 
 interface IDisposable {
 	dispose(): void;
@@ -47,17 +58,24 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		this.disposables.push(this.testStatesEmitter);
 		this.disposables.push(this.autorunEmitter);
 
-		this.disposables.push(vscode.workspace.onDidChangeConfiguration(configChange => {
+		this.disposables.push(vscode.workspace.onDidChangeConfiguration(async configChange => {
 
 			this.log.info('Configuration changed');
 
 			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
-				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri)) {
+				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.nodeArgv', this.workspaceFolder.uri)) {
 
 				this.log.info('Sending reload event');
 				this.config = undefined;
 				this.load();
+
+			} else if (
+				configChange.affectsConfiguration('jasmineExplorer.debuggerPort', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.breakOnFirstLine', this.workspaceFolder.uri)) {
+
+				this.config = await this.loadConfig();
 			}
 		}));
 
@@ -111,10 +129,10 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			children: []
 		}
 
-		const suites: {[id: string]: TestSuiteInfo} = {};
+		const suites: { [id: string]: TestSuiteInfo } = {};
 
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
-			const args = [ config.configFilePath, JSON.stringify(this.log.enabled) ];
+			const args = [config.configFilePath, JSON.stringify(this.log.enabled)];
 			const childProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
@@ -122,7 +140,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv: [],
+					execArgv: config.nodeArgv,
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
@@ -161,18 +179,18 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		function sort(suite: (TestInfo | TestSuiteInfo)) {
 			const s = suite as TestSuiteInfo;
 			if (s.children) {
-				s.children = s.children.sort((a, b) => {
+				s.children = s.children.sort((a, b) => {
 					return a.line! - b.line!;
 				});
-				s.children.forEach((suite) => sort(suite));
+				s.children.forEach((suite) => sort(suite));
 			}
 			return s;
 		}
 
 		// Sort the suites by their filenames
-		Object.keys(suites).sort((a, b) => {
+		Object.keys(suites).sort((a, b) => {
 			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
-		}).forEach((file) => {
+		}).forEach((file) => {
 			rootSuite.children.push(sort(suites[file]));
 		});
 
@@ -208,7 +226,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			tests.push(test);
 		}
 
-		const args = [ config.configFilePath, JSON.stringify(this.log.enabled) ];
+		const args = [config.configFilePath, JSON.stringify(this.log.enabled)];
 		if (tests) {
 			args.push(JSON.stringify(tests));
 		}
@@ -221,7 +239,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					cwd: this.workspaceFolder.uri.fsPath,
 					env: config.env,
 					execPath: config.nodePath,
-					execArgv,
+					execArgv: execArgv.concat(config.nodeArgv),
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
@@ -242,7 +260,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 						message.decorations = this.createDecorations(message, testfiles);
 						delete message.failures;
 					}
-	
+
 					this.testStatesEmitter.fire(message);
 				}
 			});
@@ -263,7 +281,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		if (this.log.enabled) this.log.info(`Debugging test(s) ${JSON.stringify(testsToRun)} of ${this.workspaceFolder.uri.fsPath}`);
 
-		let currentSession: vscode.DebugSession | undefined; 
+		let currentSession: vscode.DebugSession | undefined;
 		// Add a breakpoint on the 1st line of the debugger
 		if (this.config.breakOnFirstLine) {
 			const node = this.nodesById.get(testsToRun[0]);
@@ -271,7 +289,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				const fileURI = vscode.Uri.file(node.file);
 				const breakpoint = new vscode.SourceBreakpoint(new vscode.Location(fileURI, new vscode.Position(node.line + 1, 0)));
 				vscode.debug.addBreakpoints([breakpoint]);
-				const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
+				const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
 					if (currentSession != session) { return; }
 					vscode.debug.removeBreakpoints([breakpoint]);
 					subscription.dispose();
@@ -279,7 +297,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			}
 		}
 
-		const promise = this.run(testsToRun,  [`--inspect-brk=${this.config.debuggerPort}`]);
+		const promise = this.run(testsToRun, [`--inspect-brk=${this.config.debuggerPort}`]);
 		if (!promise || !this.runningTestProcess) {
 			this.log.error('Starting the worker failed');
 			return;
@@ -304,7 +322,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 
 		// Kill the process to ensure we're good once the de
-		const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
+		const subscription = vscode.debug.onDidTerminateDebugSession((session) => {
 			if (currentSession != session) { return; }
 			this.log.info('Debug session ended');
 			this.cancel(); // just ot be sure
@@ -350,7 +368,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		let jasmineConfig: any;
 		try {
 			jasmineConfig = await fs.readJson(configFilePath);
-		} catch(e) {
+		} catch (e) {
 			return undefined;
 		}
 
@@ -385,12 +403,15 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 		if (this.log.enabled) this.log.debug(`Using nodePath: ${nodePath}`);
 
+		let nodeArgv: string[] = adapterConfig.get<string[]>('nodeArgv') || [];
+		if (this.log.enabled) this.log.debug(`Using node arguments: ${nodeArgv}`);
+
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
 
 		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
-		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, breakOnFirstLine};
+		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, nodeArgv, breakOnFirstLine };
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -467,6 +488,7 @@ interface LoadedConfig {
 	testFileGlobs: IMinimatch[];
 	debuggerPort: number;
 	nodePath: string | undefined;
+	nodeArgv: string[];
 	env: { [prop: string]: any };
 	breakOnFirstLine: boolean;
 }
