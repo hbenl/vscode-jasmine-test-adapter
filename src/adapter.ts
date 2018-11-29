@@ -62,7 +62,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 			this.log.info('Configuration changed');
 
-			if (configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
+			if (configChange.affectsConfiguration('jasmineExplorer.cwd', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.nodeArgv', this.workspaceFolder.uri)) {
@@ -137,7 +138,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				require.resolve('./worker/loadTests.js'),
 				args,
 				{
-					cwd: this.workspaceFolder.uri.fsPath,
+					cwd: config.cwd,
 					env: config.env,
 					execPath: config.nodePath,
 					execArgv: config.nodeArgv,
@@ -236,7 +237,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				require.resolve('./worker/runTests.js'),
 				args,
 				{
-					cwd: this.workspaceFolder.uri.fsPath,
+					cwd: config.cwd,
 					env: config.env,
 					execPath: config.nodePath,
 					execArgv: execArgv.concat(config.nodeArgv),
@@ -361,8 +362,11 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 	private async loadConfig(): Promise<LoadedConfig | undefined> {
 
 		const adapterConfig = vscode.workspace.getConfiguration('jasmineExplorer', this.workspaceFolder.uri);
+
+		const cwd = path.resolve(this.workspaceFolder.uri.fsPath, adapterConfig.get<string>('cwd') || '');
+
 		const relativeConfigFilePath = adapterConfig.get<string>('config') || 'spec/support/jasmine.json';
-		const configFilePath = path.resolve(this.workspaceFolder.uri.fsPath, relativeConfigFilePath);
+		const configFilePath = path.resolve(cwd, relativeConfigFilePath);
 		if (this.log.enabled) this.log.debug(`Using config file: ${configFilePath}`);
 
 		let jasmineConfig: any;
@@ -372,12 +376,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			return undefined;
 		}
 
-		const specDir = path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir);
+		const specDir = path.resolve(cwd, jasmineConfig.spec_dir);
 		if (this.log.enabled) this.log.debug(`Using specDir: ${specDir}`);
 
 		const testFileGlobs: IMinimatch[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
-			const absoluteGlob = path.resolve(this.workspaceFolder.uri.fsPath, jasmineConfig.spec_dir, relativeGlob);
+			const absoluteGlob = path.resolve(cwd, jasmineConfig.spec_dir, relativeGlob);
 			if (this.log.enabled) this.log.debug(`Using test file glob: ${absoluteGlob}`);
 			testFileGlobs.push(new Minimatch(absoluteGlob));
 		}
@@ -411,7 +415,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
-		return { configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, nodeArgv, breakOnFirstLine };
+		return { cwd, configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, nodeArgv, breakOnFirstLine };
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -483,6 +487,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 }
 
 interface LoadedConfig {
+	cwd: string;
 	configFilePath: string;
 	specDir: string;
 	testFileGlobs: IMinimatch[];

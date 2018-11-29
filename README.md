@@ -33,7 +33,8 @@ The following configuration properties are available:
 
 Property                           | Description
 -----------------------------------|---------------------------------------------------------------
-`jasmineExplorer.config`           | The location of the Jasmine config file (relative to the workspace folder) (default: `"spec/support/jasmine.json"`)
+`jasmineExplorer.cwd`              | The working directory where Jasmine is run (relative to the workspace folder). Note that the path to the Jasmine config file and the paths within that file are relative to this directory.
+`jasmineExplorer.config`           | The location of the Jasmine config file (relative to the working directory) (default: `"spec/support/jasmine.json"`)
 `jasmineExplorer.env`              | Environment variables to be set when running the tests
 `jasmineExplorer.nodePath`         | The path to the node executable to use. By default it will attempt to find it on your PATH, if it can't find it or if this option is set to `null`, it will use the one shipped with VS Code
 `jasmineExplorer.nodeArgv`         | The arguments to the node executable to use

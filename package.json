@@ -68,8 +68,13 @@
       "type": "object",
       "title": "Jasmine Test Explorer",
       "properties": {
+        "jasmineExplorer.cwd": {
+          "description": "The working directory where Jasmine is run (relative to the workspace folder)",
+          "type": "string",
+          "scope": "resource"
+        },
         "jasmineExplorer.config": {
-          "description": "The location of the Jasmine config file (relative to the workspace folder)",
+          "description": "The location of the Jasmine config file (relative to the working directory)",
           "type": "string",
           "default": "spec/support/jasmine.json",
           "scope": "resource"
