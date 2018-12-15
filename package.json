@@ -110,6 +110,15 @@
             "type": "string"
           }
         },
+        "jasmineExplorer.debuggerConfig": {
+          "description": "The name of a launch configuration to use for debugging sessions",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "scope": "resource"
+        },
         "jasmineExplorer.breakOnFirstLine": {
           "description": "when debugging, inject a breakpoint at the 1st line of the 1st run test",
           "type": "boolean",

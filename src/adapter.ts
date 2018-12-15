@@ -74,6 +74,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 			} else if (
 				configChange.affectsConfiguration('jasmineExplorer.debuggerPort', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.debuggerConfig', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.breakOnFirstLine', this.workspaceFolder.uri)) {
 
 				this.config = await this.loadConfig();
@@ -305,7 +306,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 
 		this.log.info('Starting the debug session');
-		await vscode.debug.startDebugging(this.workspaceFolder, {
+		await vscode.debug.startDebugging(this.workspaceFolder, this.config.debuggerConfig || {
 			name: 'Debug Jasmine Tests',
 			type: 'node',
 			request: 'attach',
@@ -412,10 +413,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
 
+		const debuggerConfig = adapterConfig.get<string>('debuggerConfig') || undefined;
+
 		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
-		return { cwd, configFilePath, specDir, testFileGlobs, env, debuggerPort, nodePath, nodeArgv, breakOnFirstLine };
+		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, debuggerPort, debuggerConfig, breakOnFirstLine };
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -491,10 +494,11 @@ interface LoadedConfig {
 	configFilePath: string;
 	specDir: string;
 	testFileGlobs: IMinimatch[];
-	debuggerPort: number;
+	env: { [prop: string]: any };
 	nodePath: string | undefined;
 	nodeArgv: string[];
-	env: { [prop: string]: any };
+	debuggerPort: number;
+	debuggerConfig: string | undefined;
 	breakOnFirstLine: boolean;
 }
 

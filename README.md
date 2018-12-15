@@ -29,7 +29,25 @@ Note that breakpoints may not work initially (this is a known limitation when de
 
 ## Configuration
 
-The following configuration properties are available:
+### Custom debugger configuration
+
+If you want to customize the configuration used for debugging your tests (e.g. to set `sourceMapPathOverrides`
+or `skipFiles`), you can do so by creating a debugging configuration in your `launch.json` and setting
+`jasmineExplorer.debuggerConfig` to the name of your debugging configuration.
+Here's the default debugging configuration used by this adapter:
+```
+{
+  "name": "Debug Jasmine Tests",
+  "type": "node",
+  "request": "attach",
+  "port": 9229,
+  "protocol": "inspector",
+  "timeout": 30000,
+  "stopOnEntry": false
+}
+```
+
+### Other options
 
 Property                           | Description
 -----------------------------------|---------------------------------------------------------------
