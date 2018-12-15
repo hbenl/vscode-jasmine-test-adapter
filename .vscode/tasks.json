@@ -2,14 +2,16 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Watch Jasmine",
             "type": "typescript",
-            "tsconfig": "vscode-jasmine-test-adapter/tsconfig.json",
+            "tsconfig": "tsconfig.json",
             "option": "watch",
             "problemMatcher": [
                 "$tsc-watch"
             ],
-            "label": "Watch Jasmine",
-            "auto": true
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
         }
     ]
 }
