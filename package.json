@@ -108,7 +108,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "scope": "resource"
         },
         "jasmineExplorer.debuggerConfig": {
           "description": "The name of a launch configuration to use for debugging sessions",
