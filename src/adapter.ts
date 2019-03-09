@@ -316,6 +316,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			stopOnEntry: false,
 		});
 
+		// workaround for Microsoft/vscode#70125
+		await new Promise(resolve => setImmediate(resolve));
+
 		currentSession = vscode.debug.activeDebugSession;
 		if (!currentSession) {
 			this.log.error('No active debug session - aborting');
