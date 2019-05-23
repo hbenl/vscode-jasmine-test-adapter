@@ -38,24 +38,25 @@
     "hbenl.vscode-test-explorer"
   ],
   "dependencies": {
-    "escape-string-regexp": "^1.0.5",
-    "fs-extra": "^7.0.1",
-    "jasmine": "^3.3.1",
+    "escape-string-regexp": "^2.0.0",
+    "fs-extra": "^8.0.1",
+    "jasmine": "^3.4.0",
     "minimatch": "^3.0.4",
     "stack-trace": "0.0.10",
     "tslib": "^1.9.3",
-    "vscode-test-adapter-api": "^1.1.0",
-    "vscode-test-adapter-util": "^0.5.1"
+    "vscode-test-adapter-api": "^1.7.0",
+    "vscode-test-adapter-util": "^0.7.0"
   },
   "devDependencies": {
-    "@types/escape-string-regexp": "1.0.0",
-    "@types/fs-extra": "^5.0.4",
-    "@types/jasmine": "^3.3.2",
+    "@types/escape-string-regexp": "2.0.1",
+    "@types/fs-extra": "^7.0.0",
+    "@types/jasmine": "^3.3.12",
     "@types/minimatch": "^3.0.3",
     "@types/stack-trace": "0.0.29",
-    "typescript": "^3.2.2",
-    "vsce": "^1.53.2",
-    "vscode": "^1.1.26"
+    "rimraf": "^2.6.3",
+    "typescript": "^3.4.5",
+    "vsce": "^1.61.0",
+    "vscode": "^1.1.34"
   },
   "engines": {
     "vscode": "^1.23.0"

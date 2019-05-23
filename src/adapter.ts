@@ -359,8 +359,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			this.channel.append(data.toString());
 			callback();
 		};
-		process.stderr.pipe(customStream);
-		process.stdout.pipe(customStream);
+		process.stderr!.pipe(customStream);
+		process.stdout!.pipe(customStream);
 	}
 
 	private async loadConfig(): Promise<LoadedConfig | undefined> {
