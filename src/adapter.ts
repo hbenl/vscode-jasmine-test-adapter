@@ -75,7 +75,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			} else if (
 				configChange.affectsConfiguration('jasmineExplorer.debuggerPort', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.debuggerConfig', this.workspaceFolder.uri) ||
-				configChange.affectsConfiguration('jasmineExplorer.breakOnFirstLine', this.workspaceFolder.uri)) {
+				configChange.affectsConfiguration('jasmineExplorer.breakOnFirstLine', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.debuggerSkipFiles', this.workspaceFolder.uri)) {
 
 				this.config = await this.loadConfig();
 			}
@@ -314,6 +315,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			protocol: 'inspector',
 			timeout: 30000,
 			stopOnEntry: false,
+			skipFiles: this.config.debuggerSkipFiles
 		});
 
 		// workaround for Microsoft/vscode#70125
@@ -421,7 +423,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const breakOnFirstLine: boolean = adapterConfig.get('breakOnFirstLine') || false;
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
-		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, debuggerPort, debuggerConfig, breakOnFirstLine };
+		const debuggerSkipFiles = adapterConfig.get<string[]>('debuggerSkipFiles') || [];
+
+		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -503,6 +507,7 @@ interface LoadedConfig {
 	debuggerPort: number;
 	debuggerConfig: string | undefined;
 	breakOnFirstLine: boolean;
+	debuggerSkipFiles: string[];
 }
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {
