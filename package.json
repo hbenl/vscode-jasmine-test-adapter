@@ -47,15 +47,14 @@
     "vscode-test-adapter-util": "^0.7.0"
   },
   "devDependencies": {
-    "@types/escape-string-regexp": "2.0.1",
     "@types/fs-extra": "^8.0.0",
-    "@types/jasmine": "^3.3.13",
+    "@types/jasmine": "^3.3.16",
     "@types/minimatch": "^3.0.3",
     "@types/stack-trace": "0.0.29",
     "@types/vscode": "~1.23.0",
     "rimraf": "^2.6.3",
     "typescript": "^3.5.3",
-    "vsce": "^1.65.0"
+    "vsce": "^1.66.0"
   },
   "engines": {
     "vscode": "^1.23.0"
