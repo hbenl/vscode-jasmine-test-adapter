@@ -66,7 +66,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				configChange.affectsConfiguration('jasmineExplorer.config', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri) ||
-				configChange.affectsConfiguration('jasmineExplorer.nodeArgv', this.workspaceFolder.uri)) {
+				configChange.affectsConfiguration('jasmineExplorer.nodeArgv', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.jasminePath', this.workspaceFolder.uri)) {
 
 				this.log.info('Sending reload event');
 				this.config = undefined;
@@ -135,7 +136,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const suites: { [id: string]: TestSuiteInfo } = {};
 
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
-			const args = [config.configFilePath, JSON.stringify(this.log.enabled)];
+			const args = [config.jasminePath, config.configFilePath, JSON.stringify(this.log.enabled)];
 			const childProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
@@ -229,7 +230,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			tests.push(test);
 		}
 
-		const args = [config.configFilePath, JSON.stringify(this.log.enabled)];
+		const args = [config.jasminePath, config.configFilePath, JSON.stringify(this.log.enabled)];
 		if (tests) {
 			args.push(JSON.stringify(tests));
 		}
@@ -416,6 +417,13 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		let nodeArgv: string[] = adapterConfig.get<string[]>('nodeArgv') || [];
 		if (this.log.enabled) this.log.debug(`Using node arguments: ${nodeArgv}`);
 
+		let jasminePath = adapterConfig.get<string | null>('jasminePath');
+		if (typeof jasminePath === 'string') {
+			jasminePath = path.resolve(this.workspaceFolder.uri.fsPath, jasminePath);
+		} else {
+			jasminePath = require.resolve('jasmine');
+		}
+
 		const debuggerPort = adapterConfig.get<number>('debuggerPort') || 9229;
 
 		const debuggerConfig = adapterConfig.get<string>('debuggerConfig') || undefined;
@@ -425,7 +433,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		const debuggerSkipFiles = adapterConfig.get<string[]>('debuggerSkipFiles') || [];
 
-		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
+		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, jasminePath, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -504,6 +512,7 @@ interface LoadedConfig {
 	env: { [prop: string]: any };
 	nodePath: string | undefined;
 	nodeArgv: string[];
+	jasminePath: string;
 	debuggerPort: number;
 	debuggerConfig: string | undefined;
 	breakOnFirstLine: boolean;

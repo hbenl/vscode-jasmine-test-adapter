@@ -1,5 +1,4 @@
 import * as util from 'util';
-import Jasmine = require('jasmine');
 import * as RegExEscape from 'escape-string-regexp';
 import { RunTestsReporter } from './runTestsReporter';
 
@@ -11,14 +10,17 @@ try {
 	let testsToRun: string[] | undefined;
 
 	const argv = process.argv;
-	const configFile = argv[2];
-	logEnabled = <boolean>JSON.parse(argv[3]);
+	const jasminePath = argv[2];
+	const configFile = argv[3];
+	logEnabled = <boolean>JSON.parse(argv[4]);
 
-	if (argv.length > 4) {
-		testsToRun = JSON.parse(argv[4]);
+	if (argv.length > 5) {
+		testsToRun = JSON.parse(argv[5]);
 	}
 
 	const regExp = testsToRun ? testsToRun.map(RegExEscape).join('|') : undefined;
+
+	const Jasmine = require(jasminePath);
 	const jasmine = new Jasmine({ baseProjectPath: process.cwd });
 	if (logEnabled) sendMessage('Loading config file');
 	jasmine.loadConfigFile(configFile);

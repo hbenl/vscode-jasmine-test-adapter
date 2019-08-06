@@ -56,6 +56,7 @@ Property                            | Description
 `jasmineExplorer.env`               | Environment variables to be set when running the tests
 `jasmineExplorer.nodePath`          | The path to the node executable to use. By default it will attempt to find it on your PATH, if it can't find it or if this option is set to `null`, it will use the one shipped with VS Code
 `jasmineExplorer.nodeArgv`          | The arguments to the node executable to use
+`jasmineExplorer.jasminePath`       | The path to the jasmine package to use (relative to the workspace folder). By default (or if this option is set to `null`) it uses a bundled version of jasmine, to use the one installed in your project's node_modules folder, set this option to \"node_modules/jasmine\". This is necessary if you want to use the `requires` property in `jasmine.json` to load packages installed locally in your project's `node_modules` folder.
 `jasmineExplorer.debuggerPort`      | The port for running the debug sessions (default: `9229`)
 `jasmineExplorer.breakOnFirstLine`  | Setting to `true` injects a breakpoint at the first line of your test, (default: `false`)
 `jasmineExplorer.debuggerSkipFiles` | An array of glob patterns for files to skip when debugging (default: `[]`)
