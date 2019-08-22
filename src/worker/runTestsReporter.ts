@@ -38,8 +38,10 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 				state: convertTestState(result.status),
 				message,
 			}
-			if (state === 'failed') {
-				event.failures = result.failedExpectations
+			if ((state === 'failed') && result.failedExpectations) {
+				event.failures = result.failedExpectations.map(
+					failure => ({ stack: failure.stack, message: failure.message })
+				);
 			}
 
 			this.sendMessage(event);

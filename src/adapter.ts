@@ -481,7 +481,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 	}
 
 	private createDecoration(
-		failure: jasmine.FailedExpectation,
+		failure: JasmineFailedExpectation,
 		testfile: string
 	): TestDecoration | undefined {
 
@@ -523,6 +523,11 @@ interface JasmineTestSuiteInfo extends TestSuiteInfo {
 	isFileSuite?: boolean;
 }
 
+interface JasmineFailedExpectation {
+	stack: string;
+	message: string;
+}
+
 export interface JasmineTestEvent extends TestEvent {
-	failures?: jasmine.FailedExpectation[] | undefined
+	failures?: JasmineFailedExpectation[] | undefined
 }
