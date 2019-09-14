@@ -25,6 +25,11 @@ try {
 	if (logEnabled) sendMessage('Loading config file');
 	jasmine.loadConfigFile(configFile);
 
+        // vscode output channels have no support for ANSI color codes
+        jasmine.configureDefaultReporter({
+            showColors: false
+        });
+
 	if (logEnabled) sendMessage('Executing Jasmine');
 	jasmine.execute(undefined, regExp);
 
