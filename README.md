@@ -38,12 +38,14 @@ Here's the default debugging configuration used by this adapter:
 ```
 {
   "name": "Debug Jasmine Tests",
-  "type": "node",
+  "type": "pwa-node",
   "request": "attach",
   "port": 9229,
-  "protocol": "inspector",
-  "timeout": 30000,
-  "stopOnEntry": false
+  "continueOnAttach": true,
+  "autoAttachChildProcesses": false,
+  "skipFiles": [
+    "<node_internals>/**"
+  ]
 }
 ```
 

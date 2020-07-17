@@ -310,13 +310,14 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		this.log.info('Starting the debug session');
 		await vscode.debug.startDebugging(this.workspaceFolder, this.config.debuggerConfig || {
 			name: 'Debug Jasmine Tests',
-			type: 'node',
+			type: 'pwa-node',
 			request: 'attach',
 			port: this.config.debuggerPort,
-			protocol: 'inspector',
-			timeout: 30000,
-			stopOnEntry: false,
-			skipFiles: this.config.debuggerSkipFiles
+			continueOnAttach: true,
+			autoAttachChildProcesses: false,
+			skipFiles: [
+				'<node_internals>/**'
+			]
 		});
 
 		// workaround for Microsoft/vscode#70125
