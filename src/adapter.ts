@@ -135,6 +135,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		const suites: { [id: string]: TestSuiteInfo } = {};
 
+		let errorMessage;
+
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
 			const args = [config.jasminePath, config.configFilePath, JSON.stringify(this.log.enabled)];
 			const childProcess = fork(
@@ -174,7 +176,10 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				}
 			});
 
-			childProcess.on('exit', (exitVal) => {
+			childProcess.on('exit', (code, signal) => {
+				if (code || signal) {
+					errorMessage = `The Jasmine test loader worker process finished with code ${code} and signal ${signal}`;
+				}
 				this.log.info('Worker finished');
 				resolve();
 			});
@@ -201,7 +206,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		this.nodesById.clear();
 		this.collectNodesById(rootSuite);
 
-		if (rootSuite.children.length > 0) {
+		if (errorMessage) {
+			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', errorMessage });
+		} else if (rootSuite.children.length > 0) {
 			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: rootSuite });
 		} else {
 			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: undefined });
