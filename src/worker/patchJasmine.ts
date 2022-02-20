@@ -1,5 +1,5 @@
 import Jasmine = require('jasmine');
-import { parse as parseStackTrace } from 'stack-trace';
+import * as stackTrace from 'stack-trace';
 
 export interface Location {
 	file: string
@@ -33,11 +33,11 @@ export function patchJasmine(jasmine: Jasmine): Map<string, Location> {
 
 function findCallLocation(functionName: string): Location | undefined {
 
-	const stackTrace = parseStackTrace(new Error());
+	const stackFrames = stackTrace.parse(new Error());
 
-	for (var i = 0; i < stackTrace.length - 1; i++) {
-		if (stackTrace[i].getFunctionName() === functionName) {
-			const callSite = stackTrace[i + 1];
+	for (var i = 0; i < stackFrames.length - 1; i++) {
+		if (stackFrames[i].getFunctionName() === functionName) {
+			const callSite = stackFrames[i + 1];
 			return {
 				file: callSite.getFileName(),
 				line: callSite.getLineNumber() - 1

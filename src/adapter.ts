@@ -2,7 +2,7 @@ import { ChildProcess, fork } from 'child_process';
 import * as fs from 'fs-extra';
 import { IMinimatch, Minimatch } from 'minimatch';
 import * as path from 'path';
-import { parse as parseStackTrace } from 'stack-trace';
+import * as stackTrace from 'stack-trace';
 import * as stream from 'stream';
 import * as vscode from 'vscode';
 import {
@@ -181,7 +181,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					errorMessage = `The Jasmine test loader worker process finished with code ${code} and signal ${signal}`;
 				}
 				this.log.info('Worker finished');
-				resolve();
+				resolve(undefined);
 			});
 		});
 
@@ -496,7 +496,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		if (this.log.enabled) this.log.debug(`Trying to parse stack trace: ${JSON.stringify(failure.stack)}`);
 
 		const error: Error = { name: '', message: '', stack: failure.stack };
-		const stackFrames = parseStackTrace(error);
+		const stackFrames = stackTrace.parse(error);
 
 		for (const stackFrame of stackFrames) {
 			if (stackFrame.getFileName() === testfile) {
