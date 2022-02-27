@@ -1,13 +1,15 @@
 import Jasmine = require('jasmine');
 import * as stackTrace from 'stack-trace';
+import { IMinimatch, Minimatch } from 'minimatch';
 
 export interface Location {
 	file: string
 	line: number
 }
 
-export function patchJasmine(jasmine: Jasmine): Map<string, Location> {
+export function patchJasmine(jasmine: Jasmine, globPatterns: string[]): Map<string, Location> {
 
+	const globs = globPatterns.map(pattern => new Minimatch(pattern));
 	const locations = new Map<string, Location>();
 	const env: any = jasmine.env;
 
@@ -19,7 +21,7 @@ export function patchJasmine(jasmine: Jasmine): Map<string, Location> {
 
 			const result = origImpl.apply(this, arguments);
 
-			const location = findCallLocation(functionName);
+			const location = findCallLocation(globs, functionName);
 			if (location) {
 				locations.set(result.id, location);
 			}
@@ -31,9 +33,18 @@ export function patchJasmine(jasmine: Jasmine): Map<string, Location> {
 	return locations;
 }
 
-function findCallLocation(functionName: string): Location | undefined {
+function findCallLocation(globs: IMinimatch[], functionName: string): Location | undefined {
 
 	const stackFrames = stackTrace.parse(new Error());
+
+	for (const callSite of stackFrames) {
+		if (globs.some(glob => glob.match(callSite.getFileName()))) {
+			return {
+				file: callSite.getFileName(),
+				line: callSite.getLineNumber() - 1
+			};
+		}
+	}
 
 	for (var i = 0; i < stackFrames.length - 1; i++) {
 		if (stackFrames[i].getFunctionName() === functionName) {

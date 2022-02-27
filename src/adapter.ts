@@ -138,7 +138,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		let errorMessage;
 
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
-			const args = [config.jasminePath, config.configFilePath, JSON.stringify(this.log.enabled)];
+			const args = [
+				config.jasminePath,
+				config.configFilePath,
+				JSON.stringify(config.testFileGlobs.map(glob => glob.pattern)),
+				JSON.stringify(this.log.enabled)
+			];
 			const childProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
