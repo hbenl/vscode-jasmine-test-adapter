@@ -1,4 +1,5 @@
 import { ChildProcess, fork } from 'child_process';
+import * as os from 'os';
 import * as fs from 'fs-extra';
 import { IMinimatch, Minimatch } from 'minimatch';
 import * as path from 'path';
@@ -401,7 +402,10 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		const testFileGlobs: IMinimatch[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
-			const absoluteGlob = path.resolve(cwd, jasmineConfig.spec_dir, relativeGlob);
+			let absoluteGlob = path.resolve(cwd, jasmineConfig.spec_dir, relativeGlob);
+			if (os.platform() === 'win32') {
+				absoluteGlob = absoluteGlob.replace(/\\/g, '/');
+			}
 			if (this.log.enabled) this.log.debug(`Using test file glob: ${absoluteGlob}`);
 			testFileGlobs.push(new Minimatch(absoluteGlob));
 		}
