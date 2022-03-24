@@ -511,7 +511,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		if (this.log.enabled) this.log.debug(`Trying to parse stack trace: ${JSON.stringify(failure.stack)}`);
 
-		const error: Error = { name: '', message: '', stack: failure.stack };
+		let stack = failure.stack;
+		if (stack.match(/\s+at/)) {
+			stack = failure.message + "\n" + stack;
+		}
+
+		const error: Error = { name: '', message: '', stack };
 		const stackFrames = stackTrace.parse(error);
 
 		for (const stackFrame of stackFrames) {
