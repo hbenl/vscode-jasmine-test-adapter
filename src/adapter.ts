@@ -243,10 +243,15 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			tests.push(test);
 		}
 
-		const args = [config.jasminePath, config.configFilePath, JSON.stringify(this.log.enabled)];
-		if (tests) {
-			args.push(JSON.stringify(tests));
-		}
+		// Note: on Windows the args size is limited (8191 chars?).
+		// Sometimes we need to pass a lot of test files (when running all tests in the workspace),
+		// so we need to use send(message) instead, which has no real limit.
+		const args = [JSON.stringify(this.log.enabled)];
+		const runTestsMessage = {
+			jasminePath: config.jasminePath,
+			configFilePath: config.configFilePath,
+			testsToRun: tests,
+		};
 
 		return new Promise<void>((resolve) => {
 			this.runningTestProcess = fork(
@@ -262,6 +267,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			);
 
 			this.pipeProcess(this.runningTestProcess);
+
+			this.runningTestProcess.send(runTestsMessage);
 
 			this.runningTestProcess.on('message', (message: string | JasmineTestEvent) => {
 
