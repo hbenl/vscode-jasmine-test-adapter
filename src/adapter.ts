@@ -1,6 +1,7 @@
 import { ChildProcess, fork } from 'child_process';
 import * as os from 'os';
 import * as fs from 'fs-extra';
+import { fileURLToPath } from 'url';
 import { IMinimatch, Minimatch } from 'minimatch';
 import * as path from 'path';
 import * as stackTrace from 'stack-trace';
@@ -172,8 +173,11 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				} else {
 
 					if (this.log.enabled) this.log.info(`Received tests for ${message.file} from worker`);
-					message.label = message.file!.replace(config.specDir, '');
-					const file = message.file!;
+					let file = message.file!;
+					try {
+						file = fileURLToPath(file);
+					} catch {}
+					message.label = file.replace(config.specDir, '').replace(/^\//, '');
 					if (suites[file]) {
 						suites[file].children = suites[file].children.concat(message.children);
 					} else {
@@ -206,6 +210,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		Object.keys(suites).sort((a, b) => {
 			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
 		}).forEach((file) => {
+			try {
+				file = fileURLToPath(file);
+			} catch {}
 			rootSuite.children.push(sort(suites[file]));
 		});
 
@@ -526,7 +533,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		if (this.log.enabled) this.log.debug(`Trying to parse stack trace: ${JSON.stringify(failure.stack)}`);
 
-		const error: Error = { name: '', message: '', stack: failure.stack };
+		let stack = failure.stack;
+		if (stack.match(/\s+at/)) {
+			stack = failure.message + "\n" + stack;
+		}
+
+		const error: Error = { name: '', message: '', stack };
 		const stackFrames = stackTrace.parse(error);
 
 		for (const stackFrame of stackFrames) {
