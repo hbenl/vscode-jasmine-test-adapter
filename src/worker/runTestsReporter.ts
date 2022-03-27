@@ -1,4 +1,4 @@
-import { JasmineTestEvent } from '../adapter';
+import { JasmineTestEvent, JasmineFailedExpectation } from '../shared';
 
 export class RunTestsReporter implements jasmine.CustomReporter {
 
@@ -26,9 +26,17 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 
 		if ((this.testsToReport === undefined) ||
 			(this.testsToReport.indexOf(result.fullName) >= 0)) {
+			let failures: JasmineFailedExpectation[] | undefined;
 			let message: string | undefined;
 			if (result.failedExpectations) {
-				message = result.failedExpectations.map(failed => failed.stack).join('\n');
+				failures = result.failedExpectations.map(failure => {
+					let stack = failure.stack;
+					if (stack.match(/\s+at/)) {
+						stack = failure.message + "\n" + stack;
+					}
+					return { stack, message: failure.message };
+				});
+				message = failures.map(failure => failure.stack).join('\n');
 			}
 
 			const state = convertTestState(result.status);
@@ -38,10 +46,8 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 				state: convertTestState(result.status),
 				message,
 			}
-			if ((state === 'failed') && result.failedExpectations) {
-				event.failures = result.failedExpectations.map(
-					failure => ({ stack: failure.stack, message: failure.message })
-				);
+			if ((state === 'failed') && failures) {
+				event.failures = failures;
 			}
 
 			this.sendMessage(event);

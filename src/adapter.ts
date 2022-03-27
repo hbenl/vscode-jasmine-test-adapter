@@ -20,7 +20,7 @@ import {
 	TestSuiteInfo,
 } from 'vscode-test-adapter-api';
 import { detectNodePath, Log } from 'vscode-test-adapter-util';
-import { RunTestsArgs } from './shared';
+import { JasmineFailedExpectation, JasmineTestEvent, RunTestsArgs } from './shared';
 
 interface IDisposable {
 	dispose(): void;
@@ -543,12 +543,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		if (this.log.enabled) this.log.debug(`Trying to parse stack trace: ${JSON.stringify(failure.stack)}`);
 
-		let stack = failure.stack;
-		if (stack.match(/\s+at/)) {
-			stack = failure.message + "\n" + stack;
-		}
-
-		const error: Error = { name: '', message: '', stack };
+		const error: Error = { name: '', message: '', stack: failure.stack };
 		const stackFrames = stackTrace.parse(error);
 
 		for (const stackFrame of stackFrames) {
@@ -582,13 +577,4 @@ interface LoadedConfig {
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {
 	isFileSuite?: boolean;
-}
-
-interface JasmineFailedExpectation {
-	stack: string;
-	message: string;
-}
-
-export interface JasmineTestEvent extends TestEvent {
-	failures?: JasmineFailedExpectation[] | undefined
 }
