@@ -125,7 +125,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			return;
 		}
 
-		if (this.log.enabled) this.log.info(`Loading test files of ${this.workspaceFolder.uri.fsPath}`);
+		if (this.log.enabled) this.log.info(`Loading test files of ${this.workspaceFolder.uri.fsPath} using ${this.getConfigLog()}`);
 
 		const rootSuite: TestSuiteInfo = {
 			type: 'suite',
@@ -226,7 +226,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const config = this.config;
 		if (!config) return;
 
-		if (this.log.enabled) this.log.info(`Running test(s) ${JSON.stringify(testsToRun)} of ${this.workspaceFolder.uri.fsPath}`);
+		if (this.log.enabled) this.log.info(`Running test(s) ${JSON.stringify(testsToRun)} of ${this.workspaceFolder.uri.fsPath} using ${this.getConfigLog()}`);
 
 		this.testStatesEmitter.fire(<TestRunStartedEvent>{ type: 'started', tests: testsToRun });
 
@@ -436,7 +436,21 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		let jasminePath = adapterConfig.get<string | null>('jasminePath');
 		if (typeof jasminePath === 'string') {
-			jasminePath = path.resolve(this.workspaceFolder.uri.fsPath, jasminePath);
+			if (jasminePath === 'default') {
+				const localJasminePath = path.resolve(this.workspaceFolder.uri.fsPath, 'node_modules/jasmine');
+				const hasLocalJasmine = await new Promise<boolean>(resolve => {
+					fs.stat(localJasminePath, (err, stats) => {
+						resolve(!err && stats.isDirectory());
+					});
+				});
+				if (hasLocalJasmine) {
+					jasminePath = localJasminePath;
+				} else {
+					jasminePath = require.resolve('jasmine');
+				}
+			} else {
+				jasminePath = path.resolve(this.workspaceFolder.uri.fsPath, jasminePath);
+			}
 		} else {
 			jasminePath = require.resolve('jasmine');
 		}
@@ -451,6 +465,14 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		const debuggerSkipFiles = adapterConfig.get<string[]>('debuggerSkipFiles') || [];
 
 		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, jasminePath, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
+	}
+
+	private getConfigLog() {
+		if (!this.config) {
+			return "no config";
+		}
+		const { configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir } = this.config;
+		return JSON.stringify({ configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir });
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {

@@ -116,7 +116,7 @@
             "string",
             "null"
           ],
-          "default": null,
+          "default": "default",
           "scope": "resource"
         },
         "jasmineExplorer.debuggerConfig": {
