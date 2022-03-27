@@ -20,6 +20,7 @@ import {
 	TestSuiteInfo,
 } from 'vscode-test-adapter-api';
 import { detectNodePath, Log } from 'vscode-test-adapter-util';
+import { RunTestsArgs } from './shared';
 
 interface IDisposable {
 	dispose(): void;
@@ -253,16 +254,18 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			tests.push(test);
 		}
 
-		const args = [config.jasminePath, config.configFilePath, JSON.stringify(this.log.enabled)];
-		if (tests) {
-			args.push(JSON.stringify(tests));
-		}
+		const args: RunTestsArgs = {
+			jasminePath: config.jasminePath,
+			configFile: config.configFilePath,
+			logEnabled: this.log.enabled,
+			testsToRun: tests,
+		};
 
 		return new Promise<void>((resolve) => {
 			this.stderr = Buffer.alloc(0);
 			this.runningTestProcess = fork(
 				require.resolve('./worker/runTests.js'),
-				args,
+				[],
 				{
 					cwd: config.cwd,
 					env: config.env,
@@ -273,6 +276,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			);
 
 			this.pipeProcess(this.runningTestProcess);
+
+			this.runningTestProcess.send(args);
 
 			this.runningTestProcess.on('message', (message: string | JasmineTestEvent) => {
 
