@@ -38,6 +38,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 	private runningTestProcess: ChildProcess | undefined;
 
+	private stderr?: Buffer;
+
 	get tests(): vscode.Event<TestLoadStartedEvent | TestLoadFinishedEvent> {
 		return this.testsEmitter.event;
 	}
@@ -146,6 +148,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				JSON.stringify(config.testFileGlobs.map(glob => glob.pattern)),
 				JSON.stringify(this.log.enabled)
 			];
+			this.stderr = Buffer.alloc(0);
 			const childProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
@@ -188,7 +191,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 			childProcess.on('exit', (code, signal) => {
 				if (code || signal) {
-					errorMessage = `The Jasmine test loader worker process finished with code ${code} and signal ${signal}`;
+					errorMessage = `The Jasmine test loader worker process finished with code ${code} and signal ${signal}.\n${this.stderr?.toString()}`;
 				}
 				this.log.info('Worker finished');
 				resolve(undefined);
@@ -256,6 +259,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 
 		return new Promise<void>((resolve) => {
+			this.stderr = Buffer.alloc(0);
 			this.runningTestProcess = fork(
 				require.resolve('./worker/runTests.js'),
 				args,
@@ -380,6 +384,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 	private pipeProcess(process: ChildProcess) {
 		const customStream = new stream.Writable();
 		customStream._write = (data, encoding, callback) => {
+			this.stderr = Buffer.concat([this.stderr, data]);
 			this.channel.append(data.toString());
 			callback();
 		};
