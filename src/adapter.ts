@@ -181,7 +181,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					try {
 						file = fileURLToPath(file);
 					} catch {}
-					message.label = file.replace(config.specDir, '').replace(/^\//, '');
+					if (this.log.enabled) this.log.info(`spec dir ${config.specDir} file ${file}`);
+					let baseDir = config.specRealDir;
+					if (file.startsWith(config.specDir) && !file.startsWith(config.specRealDir)) {
+						baseDir = config.specDir;
+					} 
+					message.label = file.replace(baseDir, '').replace(/^\//, '');
 					if (suites[file]) {
 						suites[file].children = suites[file].children.concat(message.children);
 					} else {
@@ -415,7 +420,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 
 		const specDir = path.resolve(cwd, jasmineConfig.spec_dir);
-		if (this.log.enabled) this.log.debug(`Using specDir: ${specDir}`);
+		const specRealDir = await fs.realpath(specDir);
+		if (this.log.enabled) this.log.debug(`Using specDir: ${specDir}, specRealDir; ${specRealDir}`);
 
 		const testFileGlobs: IMinimatch[] = [];
 		for (const relativeGlob of jasmineConfig.spec_files) {
@@ -481,15 +487,15 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		const debuggerSkipFiles = adapterConfig.get<string[]>('debuggerSkipFiles') || [];
 
-		return { cwd, configFilePath, specDir, testFileGlobs, env, nodePath, nodeArgv, jasminePath, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
+		return { cwd, configFilePath, specDir, specRealDir, testFileGlobs, env, nodePath, nodeArgv, jasminePath, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
 	}
 
 	private getConfigLog() {
 		if (!this.config) {
 			return "no config";
 		}
-		const { configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir } = this.config;
-		return JSON.stringify({ configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir });
+		const { configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir, specRealDir } = this.config;
+		return JSON.stringify({ configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir, specRealDir });
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
@@ -564,6 +570,7 @@ interface LoadedConfig {
 	cwd: string;
 	configFilePath: string;
 	specDir: string;
+	specRealDir: string;
 	testFileGlobs: IMinimatch[];
 	env: { [prop: string]: any };
 	nodePath: string | undefined;
