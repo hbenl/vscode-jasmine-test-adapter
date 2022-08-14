@@ -38,7 +38,8 @@ function findCallLocation(globs: IMinimatch[], functionName: string): Location |
 	const stackFrames = stackTrace.parse(new Error());
 
 	for (const callSite of stackFrames) {
-		if (globs.some(glob => glob.match(callSite.getFileName()))) {
+		const fileName = callSite.getFileName();
+        if (fileName && globs.some(glob => glob.match(fileName))) {
 			return {
 				file: callSite.getFileName(),
 				line: callSite.getLineNumber() - 1
