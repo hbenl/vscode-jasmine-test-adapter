@@ -31,7 +31,7 @@ export class RunTestsReporter implements jasmine.CustomReporter {
 			if (result.failedExpectations) {
 				failures = result.failedExpectations.map(failure => {
 					let stack = failure.stack;
-					if (stack.match(/^\s+at/)) {
+					if (stack && stack.match(/^\s+at/)) {
 						stack = failure.message + "\n" + stack;
 					}
 					return { stack, message: failure.message };
