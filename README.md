@@ -62,6 +62,7 @@ Property                            | Description
 `jasmineExplorer.debuggerPort`      | The port for running the debug sessions (default: `9229`)
 `jasmineExplorer.breakOnFirstLine`  | Setting to `true` injects a breakpoint at the first line of your test, (default: `false`)
 `jasmineExplorer.debuggerSkipFiles` | An array of glob patterns for files to skip when debugging (default: `[]`)
+`jasmineExplorer.groupByDescribe`   | true|false, false by default, groups testcases heirarchically by describe field, instead of grouping them by file name, in test explorer panel
 `testExplorer.codeLens`             | Show a CodeLens above each test or suite for running or debugging the tests
 `testExplorer.gutterDecoration`     | Show the state of each test in the editor using Gutter Decorations
 `testExplorer.onStart`              | Retire or reset all test states whenever a test run is started

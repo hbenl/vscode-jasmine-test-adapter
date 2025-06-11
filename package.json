@@ -5,7 +5,7 @@
   "icon": "img/icon.png",
   "author": "Holger Benl <hbenl@evandor.de>",
   "publisher": "hbenl",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "license": "MIT",
   "homepage": "https://github.com/hbenl/vscode-jasmine-test-adapter",
   "repository": {
@@ -151,7 +151,13 @@
           "description": "write diagnostic logs to the given file",
           "type": "string",
           "scope": "resource"
-        }
+        },
+        "jasmineExplorer.groupByDescribe": {
+          "description": "Group tests by describe blocks instead of file names",
+          "type": "boolean",
+          "default": false,
+          "scope": "resource"
+        }        
       }
     }
   }

@@ -36,6 +36,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 	private config?: LoadedConfig;
 	private nodesById = new Map<string, TestSuiteInfo | TestInfo>();
+	private describeGroups = new Map<string, TestSuiteInfo>();
 
 	private runningTestProcess: ChildProcess | undefined;
 
@@ -72,7 +73,8 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				configChange.affectsConfiguration('jasmineExplorer.env', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.nodePath', this.workspaceFolder.uri) ||
 				configChange.affectsConfiguration('jasmineExplorer.nodeArgv', this.workspaceFolder.uri) ||
-				configChange.affectsConfiguration('jasmineExplorer.jasminePath', this.workspaceFolder.uri)) {
+				configChange.affectsConfiguration('jasmineExplorer.jasminePath', this.workspaceFolder.uri) ||
+				configChange.affectsConfiguration('jasmineExplorer.groupByDescribe', this.workspaceFolder.uri)) {
 
 				this.log.info('Sending reload event');
 				this.config = undefined;
@@ -140,14 +142,20 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		const suites: { [id: string]: TestSuiteInfo } = {};
 
-		let errorMessage;
+		// Clear describeGroups when grouping by describe
+		if (config.groupByDescribe) {
+			this.describeGroups.clear();
+		}
+
+		let errorMessage: string | undefined;
 
 		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
 			const args = [
 				config.jasminePath,
 				config.configFilePath,
 				JSON.stringify(config.testFileGlobs.map(glob => glob.pattern)),
-				JSON.stringify(this.log.enabled)
+				JSON.stringify(this.log.enabled),
+				JSON.stringify(config.groupByDescribe)
 			];
 			this.stderr = Buffer.alloc(0);
 			const childProcess = fork(
@@ -164,10 +172,6 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 			this.pipeProcess(childProcess);
 
-			// The loader emits one suite per file, in order of running
-			// When running in random order, the same file may have multiple suites emitted
-			// This way the only thing we need to do is just to replace the name
-			// With a shorter one
 			childProcess.on('message', (message: string | JasmineTestSuiteInfo) => {
 
 				if (typeof message === 'string') {
@@ -177,20 +181,27 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				} else {
 
 					if (this.log.enabled) this.log.info(`Received tests for ${message.file} from worker`);
-					let file = message.file!;
-					try {
-						file = fileURLToPath(file);
-					} catch {}
-					if (this.log.enabled) this.log.info(`spec dir ${config.specDir} file ${file}`);
-					let baseDir = config.specRealDir;
-					if (file.startsWith(config.specDir) && !file.startsWith(config.specRealDir)) {
-						baseDir = config.specDir;
-					} 
-					message.label = file.replace(baseDir, '').replace(/^\//, '');
-					if (suites[file]) {
-						suites[file].children = suites[file].children.concat(message.children);
+					
+					if (config.groupByDescribe) {
+						// When grouping by describe, we need to reorganize the suites
+						this.processMessageByDescribe(message, rootSuite);
 					} else {
-						suites[file] = message;
+						// Original file-based processing
+						let file = message.file!;
+						try {
+							file = fileURLToPath(file);
+						} catch {}
+						if (this.log.enabled) this.log.info(`spec dir ${config.specDir} file ${file}`);
+						let baseDir = config.specRealDir;
+						if (file.startsWith(config.specDir) && !file.startsWith(config.specRealDir)) {
+							baseDir = config.specDir;
+						} 
+						message.label = file.replace(baseDir, '').replace(/^\//, '');
+						if (suites[file]) {
+							suites[file].children = suites[file].children.concat(message.children);
+						} else {
+							suites[file] = message;
+						}
 					}
 				}
 			});
@@ -215,15 +226,26 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			return s;
 		}
 
-		// Sort the suites by their filenames
-		Object.keys(suites).sort((a, b) => {
-			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
-		}).forEach((file) => {
-			try {
-				file = fileURLToPath(file);
-			} catch {}
-			rootSuite.children.push(sort(suites[file]));
-		});
+		if (config.groupByDescribe) {
+			// Sort describe groups alphabetically
+			const sortedGroups = Array.from(this.describeGroups.entries()).sort((a, b) => 
+				a[0].toLocaleLowerCase().localeCompare(b[0].toLocaleLowerCase())
+			);
+			
+			for (const [, group] of sortedGroups) {
+				rootSuite.children.push(sort(group));
+			}
+		} else {
+			// Original file-based sorting
+			Object.keys(suites).sort((a, b) => {
+				return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
+			}).forEach((file) => {
+				try {
+					file = fileURLToPath(file);
+				} catch {}
+				rootSuite.children.push(sort(suites[file]));
+			});
+		}
 
 		this.nodesById.clear();
 		this.collectNodesById(rootSuite);
@@ -234,6 +256,93 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: rootSuite });
 		} else {
 			this.testsEmitter.fire(<TestLoadFinishedEvent>{ type: 'finished', suite: undefined });
+		}
+	}
+
+	private processMessageByDescribe(message: JasmineTestSuiteInfo, rootSuite: TestSuiteInfo): void {
+		// Process each child in the message
+		for (const child of message.children) {
+			this.addToDescribeGroup(child, rootSuite, message.file!);
+		}
+	}
+
+	private addToDescribeGroup(node: TestSuiteInfo | TestInfo, rootSuite: TestSuiteInfo, file: string): void {
+		if (node.type === 'suite') {
+			const suite = node as TestSuiteInfo;
+			
+			// Get or create the describe group at the root level
+			let describeGroup = this.describeGroups.get(suite.label);
+			if (!describeGroup) {
+				describeGroup = {
+					type: 'suite',
+					id: `describe:${suite.label}`,
+					label: suite.label,
+					children: [],
+					file: suite.file || file,
+					line: suite.line
+				};
+				this.describeGroups.set(suite.label, describeGroup);
+				rootSuite.children.push(describeGroup);
+			}
+			
+			// Now we need to merge the suite's content into the describe group
+			this.mergeSuiteIntoGroup(describeGroup, suite, file);
+		} else {
+			// Test at root level (not in any describe)
+			let ungrouped = this.describeGroups.get('_ungrouped_');
+			if (!ungrouped) {
+				ungrouped = {
+					type: 'suite',
+					id: 'describe:_ungrouped_',
+					label: 'Tests',
+					children: []
+				};
+				this.describeGroups.set('_ungrouped_', ungrouped);
+				rootSuite.children.push(ungrouped);
+			}
+			const test = node as TestInfo;
+			test.file = test.file || file;
+			ungrouped.children.push(test);
+		}
+	}
+
+	private mergeSuiteIntoGroup(targetGroup: TestSuiteInfo, sourceSuite: TestSuiteInfo, file: string): void {
+		// Process each child of the source suite
+		for (const child of sourceSuite.children) {
+			if (child.type === 'suite') {
+				// For nested suites, we need to find or create the matching child in the target
+				const childSuite = child as TestSuiteInfo;
+				let matchingChild: TestSuiteInfo | undefined;
+				
+				// Look for an existing child with the same label
+				for (const targetChild of targetGroup.children) {
+					if (targetChild.type === 'suite' && targetChild.label === childSuite.label) {
+						matchingChild = targetChild as TestSuiteInfo;
+						break;
+					}
+				}
+				
+				if (!matchingChild) {
+					// Create a new child suite
+					matchingChild = {
+						type: 'suite',
+						id: childSuite.id,
+						label: childSuite.label,
+						file: childSuite.file || file,
+						line: childSuite.line,
+						children: []
+					};
+					targetGroup.children.push(matchingChild);
+				}
+				
+				// Recursively merge the children
+				this.mergeSuiteIntoGroup(matchingChild, childSuite, file);
+			} else {
+				// For tests, just add them to the target group
+				const test = child as TestInfo;
+				test.file = test.file || file;
+				targetGroup.children.push(test);
+			}
 		}
 	}
 
@@ -394,7 +503,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 	private pipeProcess(process: ChildProcess) {
 		const customStream = new stream.Writable();
 		customStream._write = (data, encoding, callback) => {
-			this.stderr = Buffer.concat([this.stderr, data]);
+			this.stderr = Buffer.concat([this.stderr!, data]);
 			this.channel.append(data.toString());
 			callback();
 		};
@@ -486,8 +595,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		if (this.log.enabled) this.log.debug(`Using breakOnFirstLine: ${breakOnFirstLine}`);
 
 		const debuggerSkipFiles = adapterConfig.get<string[]>('debuggerSkipFiles') || [];
+		const groupByDescribe = adapterConfig.get<boolean>('groupByDescribe') || false;
 
-		return { cwd, configFilePath, specDir, specRealDir, testFileGlobs, env, nodePath, nodeArgv, jasminePath, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles };
+		return { cwd, configFilePath, specDir, specRealDir, testFileGlobs, env, nodePath, nodeArgv, jasminePath, debuggerPort, debuggerConfig, breakOnFirstLine, debuggerSkipFiles, groupByDescribe };
 	}
 
 	private getConfigLog() {
@@ -580,6 +690,7 @@ interface LoadedConfig {
 	debuggerConfig: string | undefined;
 	breakOnFirstLine: boolean;
 	debuggerSkipFiles: string[];
+	groupByDescribe: boolean;
 }
 
 interface JasmineTestSuiteInfo extends TestSuiteInfo {

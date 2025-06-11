@@ -11,6 +11,7 @@ try {
 	const configFile = process.argv[3];
 	const testFileGlobs: string[] = JSON.parse(process.argv[4]);
 	logEnabled = <boolean>JSON.parse(process.argv[5]);
+	const groupByDescribe = process.argv[6] ? <boolean>JSON.parse(process.argv[6]) : false;
 
 	const Jasmine = require(jasminePath);
 	const jasmine = new Jasmine({});
@@ -27,7 +28,7 @@ try {
 	// Note that jasmine will start the tests asynchronously, so the reporter will still
 	// be added before the tests are run.
 	if (logEnabled) sendMessage('Creating and adding reporter');
-	jasmine.env.addReporter(new LoadTestsReporter(sendMessage, locations));
+	jasmine.env.addReporter(new LoadTestsReporter(sendMessage, locations, groupByDescribe));
 
 } catch (err) {
 	if (logEnabled) sendMessage(`Caught error ${util.inspect(err)}`);
