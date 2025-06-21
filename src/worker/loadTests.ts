@@ -2,7 +2,18 @@ import * as util from 'util';
 import { LoadTestsReporter } from './loadTestsReporter';
 import { patchJasmine } from './patchJasmine';
 
-const sendMessage = process.send ? (message: any) => process.send!(message) : () => {};
+
+function sendMessage(message: any): Promise<void> {
+	if (!process.send) return Promise.resolve();
+	return new Promise((resolve, reject) => {
+		process.send!(message, undefined, undefined, error => {
+			if (error)
+				reject(error);
+			else
+				resolve();
+		});
+	});
+}
 
 let logEnabled = false;
 try {

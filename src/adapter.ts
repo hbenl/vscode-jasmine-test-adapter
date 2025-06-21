@@ -131,18 +131,16 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		if (this.log.enabled) this.log.info(`Loading test files of ${this.workspaceFolder.uri.fsPath} using ${this.getConfigLog()}`);
 
-		const rootSuite: TestSuiteInfo = {
+		let rootSuite: TestSuiteInfo = {
 			type: 'suite',
 			id: 'root',
 			label: 'Jasmine',
 			children: []
 		}
 
-		const suites: { [id: string]: TestSuiteInfo } = {};
-
 		let errorMessage;
 
-		await new Promise<JasmineTestSuiteInfo | undefined>(resolve => {
+		await new Promise<void>(resolve => {
 			const args = [
 				config.jasminePath,
 				config.configFilePath,
@@ -150,7 +148,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				JSON.stringify(this.log.enabled)
 			];
 			this.stderr = Buffer.alloc(0);
-			const childProcess = fork(
+			const loadingTestsProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
 				{
@@ -161,14 +159,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
+			this.pipeProcess(loadingTestsProcess);
 
-			this.pipeProcess(childProcess);
-
-			// The loader emits one suite per file, in order of running
-			// When running in random order, the same file may have multiple suites emitted
-			// This way the only thing we need to do is just to replace the name
-			// With a shorter one
-			childProcess.on('message', (message: string | JasmineTestSuiteInfo) => {
+			loadingTestsProcess.on('message', (message: string | TestSuiteInfo) => {
 
 				if (typeof message === 'string') {
 
@@ -176,54 +169,21 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 				} else {
 
-					if (this.log.enabled) this.log.info(`Received tests for ${message.file} from worker`);
-					let file = message.file!;
-					try {
-						file = fileURLToPath(file);
-					} catch {}
-					if (this.log.enabled) this.log.info(`spec dir ${config.specDir} file ${file}`);
-					let baseDir = config.specRealDir;
-					if (file.startsWith(config.specDir) && !file.startsWith(config.specRealDir)) {
-						baseDir = config.specDir;
-					} 
-					message.label = file.replace(baseDir, '').replace(/^\//, '');
-					if (suites[file]) {
-						suites[file].children = suites[file].children.concat(message.children);
-					} else {
-						suites[file] = message;
-					}
+					rootSuite = message;
+
 				}
 			});
 
-			childProcess.on('exit', (code, signal) => {
+			loadingTestsProcess.on('exit', (code, signal) => {
 				if (code || signal) {
 					errorMessage = `The Jasmine test loader worker process finished with code ${code} and signal ${signal}.\n${this.stderr?.toString()}`;
 				}
 				this.log.info('Worker finished');
-				resolve(undefined);
+				resolve();
 			});
 		});
 
-		function sort(suite: (TestInfo | TestSuiteInfo)) {
-			const s = suite as TestSuiteInfo;
-			if (s.children) {
-				s.children = s.children.sort((a, b) => {
-					return a.line! - b.line!;
-				});
-				s.children.forEach((suite) => sort(suite));
-			}
-			return s;
-		}
-
-		// Sort the suites by their filenames
-		Object.keys(suites).sort((a, b) => {
-			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
-		}).forEach((file) => {
-			try {
-				file = fileURLToPath(file);
-			} catch {}
-			rootSuite.children.push(sort(suites[file]));
-		});
+		this.createFileSuites(rootSuite);
 
 		this.nodesById.clear();
 		this.collectNodesById(rootSuite);
@@ -498,6 +458,43 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		return JSON.stringify({ configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir, specRealDir });
 	}
 
+	private createFileSuites(rootSuite: TestSuiteInfo) {
+		const testsByFile: { [id: string]: TestSuiteInfo } = {};
+		const testsWithoutFile: (TestSuiteInfo | TestInfo)[] = [];
+		for (const child of rootSuite.children) {
+			if (!child.file) {
+				testsWithoutFile.push(child);
+			} else {
+				let file = child.file;
+				try {
+					file = fileURLToPath(file);
+				} catch {}
+				if (!testsByFile[file]) {
+					let baseDir = this.config!.specRealDir;
+					if (file.startsWith(this.config!.specDir) &&
+						!file.startsWith(this.config!.specRealDir)) {
+						baseDir = this.config!.specDir;
+					}
+					testsByFile[file] = {
+						type: 'suite',
+						id: file,
+						file,
+						label: file.replace(baseDir, '').replace(/^\//, ''),
+						children: [],
+					} as TestSuiteInfo;
+				}
+				testsByFile[file].children.push(child);
+			}
+		}
+
+		const fileSuites: (TestInfo | TestSuiteInfo)[] = [];
+		Object.keys(testsByFile).sort((a, b) => {
+			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
+		}).forEach(file => fileSuites.push(testsByFile[file]));
+
+		rootSuite.children = fileSuites.concat(testsWithoutFile);
+	}
+
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
 		this.nodesById.set(info.id, info);
 		if (info.type === 'suite') {
@@ -580,8 +577,4 @@ interface LoadedConfig {
 	debuggerConfig: string | undefined;
 	breakOnFirstLine: boolean;
 	debuggerSkipFiles: string[];
-}
-
-interface JasmineTestSuiteInfo extends TestSuiteInfo {
-	isFileSuite?: boolean;
 }
