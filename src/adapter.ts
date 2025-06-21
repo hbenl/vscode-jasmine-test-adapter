@@ -1,6 +1,7 @@
 import { ChildProcess, fork } from 'child_process';
 import * as os from 'os';
 import * as fs from 'fs-extra';
+import { fileURLToPath } from 'url';
 import { IMinimatch, Minimatch } from 'minimatch';
 import * as path from 'path';
 import * as stackTrace from 'stack-trace';
@@ -182,7 +183,9 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 			});
 		});
 
-		this.nodesById.clear()
+		this.createFileSuites(rootSuite);
+
+		this.nodesById.clear();
 		this.collectNodesById(rootSuite);
 
 		if (errorMessage) {
@@ -453,6 +456,43 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 		}
 		const { configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir, specRealDir } = this.config;
 		return JSON.stringify({ configFilePath, cwd, jasminePath, nodeArgv, nodePath, specDir, specRealDir });
+	}
+
+	private createFileSuites(rootSuite: TestSuiteInfo) {
+		const testsByFile: { [id: string]: TestSuiteInfo } = {};
+		const testsWithoutFile: (TestSuiteInfo | TestInfo)[] = [];
+		for (const child of rootSuite.children) {
+			if (!child.file) {
+				testsWithoutFile.push(child);
+			} else {
+				let file = child.file;
+				try {
+					file = fileURLToPath(file);
+				} catch {}
+				if (!testsByFile[file]) {
+					let baseDir = this.config!.specRealDir;
+					if (file.startsWith(this.config!.specDir) &&
+						!file.startsWith(this.config!.specRealDir)) {
+						baseDir = this.config!.specDir;
+					}
+					testsByFile[file] = {
+						type: 'suite',
+						id: file,
+						file,
+						label: file.replace(baseDir, '').replace(/^\//, ''),
+						children: [],
+					} as TestSuiteInfo;
+				}
+				testsByFile[file].children.push(child);
+			}
+		}
+
+		const fileSuites: (TestInfo | TestSuiteInfo)[] = [];
+		Object.keys(testsByFile).sort((a, b) => {
+			return a.toLocaleLowerCase() < b.toLocaleLowerCase() ? -1 : 1;
+		}).forEach(file => fileSuites.push(testsByFile[file]));
+
+		rootSuite.children = fileSuites.concat(testsWithoutFile);
 	}
 
 	private collectNodesById(info: TestSuiteInfo | TestInfo): void {
