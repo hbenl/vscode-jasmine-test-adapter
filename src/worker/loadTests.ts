@@ -31,7 +31,6 @@ try {
 	const configFile = process.argv[3];
 	const testFileGlobs: string[] = JSON.parse(process.argv[4]);
 	logEnabled = <boolean>JSON.parse(process.argv[5]);
-	logEnabled = true // TEMP I don't know how to turn logs on
 
 	const Jasmine = require(jasminePath);
 	const jasmine = new Jasmine({});

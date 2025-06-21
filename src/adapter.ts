@@ -42,7 +42,6 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 	private nodesById = new Map<string, TestSuiteInfo | TestInfo>();
 
 	private runningTestProcess: ChildProcess | undefined;
-	private loadingTestsProcess: ChildProcess | undefined;
 
 	private stderr?: Buffer;
 
@@ -145,7 +144,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 
 		let errorMessage;
 
-		await new Promise<TestSuiteInfo | undefined>(resolve => {
+		await new Promise<void>(resolve => {
 			const args = [
 				config.jasminePath,
 				config.configFilePath,
@@ -153,7 +152,7 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				JSON.stringify(this.log.enabled)
 			];
 			this.stderr = Buffer.alloc(0);
-			this.loadingTestsProcess = fork(
+			const loadingTestsProcess = fork(
 				require.resolve('./worker/loadTests.js'),
 				args,
 				{
@@ -164,11 +163,11 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 					stdio: ['pipe', 'pipe', 'pipe', 'ipc']
 				}
 			);
-			this.pipeProcess(this.loadingTestsProcess);
+			this.pipeProcess(loadingTestsProcess);
 			
 			let data = ''
 
-			this.loadingTestsProcess.on('message', (message: string | ChunkData) => {
+			loadingTestsProcess.on('message', (message: string | ChunkData) => {
 
 				if (typeof message === 'string') {
 
@@ -190,13 +189,12 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				}
 			});
 
-			this.loadingTestsProcess.on('exit', (code, signal) => {
+			loadingTestsProcess.on('exit', (code, signal) => {
 				if (code || signal) {
 					errorMessage = `The Jasmine test loader worker process finished with code ${code} and signal ${signal}.\n${this.stderr?.toString()}`;
 				}
 				this.log.info('Worker finished');
-				this.loadingTestsProcess = undefined
-				resolve(void 0);
+				resolve();
 			});
 		});
 

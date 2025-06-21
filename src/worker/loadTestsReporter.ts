@@ -17,7 +17,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 		this.rootSuite = {
 			type: 'suite',
 			id: 'root',
-			label: 'root',
+			label: 'Jasmine',
 			file: '.',
 			children: [],
 		};
