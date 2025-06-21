@@ -44,7 +44,7 @@ export class LoadTestsReporter implements jasmine.CustomReporter {
 
 	suiteDone() {
 		this.currentSuite.children.sort((a, b) => {
-			return a.label.toLocaleLowerCase() < b.label.toLocaleLowerCase() ? -1 : 1;
+			return a.line! - b.line!;
 		});
 		this.suiteStack.pop();
 	}
