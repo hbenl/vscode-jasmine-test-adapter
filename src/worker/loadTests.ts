@@ -4,25 +4,16 @@ import { patchJasmine } from './patchJasmine';
 
 
 function sendMessage(message: any): Promise<void> {
-	if (!process.send) return Promise.resolve()
+	if (!process.send) return Promise.resolve();
 	return new Promise((resolve, reject) => {
-		process.send!(message, undefined, undefined, (error) => {
+		process.send!(message, undefined, undefined, error => {
 			if (error)
-				reject(error)
+				reject(error);
 			else
-				resolve()
-		})
-	})
+				resolve();
+		});
+	});
 }
-
-async function sendDataInChunks(data: string, chunkSize: number = 512): Promise<void> {
-    sendMessage({ type: 'start' });
-	for (let start = 0; start < data.length; start += chunkSize) {
-    	const chunk = data.substring(start, start + chunkSize);
-        await sendMessage({ type: 'data', data: chunk });
-    }
-    sendMessage({ type: 'end' });
-};
 
 let logEnabled = false;
 try {
@@ -47,9 +38,7 @@ try {
 	// Note that jasmine will start the tests asynchronously, so the reporter will still
 	// be added before the tests are run.
 	if (logEnabled) sendMessage('Creating and adding reporter');
-	jasmine.env.addReporter(new LoadTestsReporter((results) => {
-		return sendDataInChunks(JSON.stringify(results));
-	}, locations));
+	jasmine.env.addReporter(new LoadTestsReporter(sendMessage, locations));
 
 } catch (err) {
 	if (logEnabled) sendMessage(`Caught error ${util.inspect(err)}`);

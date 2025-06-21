@@ -25,11 +25,6 @@ interface IDisposable {
 	dispose(): void;
 }
 
-type ChunkData = {
-	type: 'start' | 'data' | 'end'
-	data?: string
-}
-
 export class JasmineAdapter implements TestAdapter, IDisposable {
 
 	private disposables: IDisposable[] = [];
@@ -164,28 +159,17 @@ export class JasmineAdapter implements TestAdapter, IDisposable {
 				}
 			);
 			this.pipeProcess(loadingTestsProcess);
-			
-			let data = ''
 
-			loadingTestsProcess.on('message', (message: string | ChunkData) => {
+			loadingTestsProcess.on('message', (message: string | TestSuiteInfo) => {
 
 				if (typeof message === 'string') {
 
 					this.log.info(`Worker: ${message}`);
 
 				} else {
-					switch (message.type) {
-						case 'start':
-							data = ''
-							break
-						case 'data' :
-							data += message.data!
-							break
-						case 'end':
-							rootSuite = JSON.parse(data)
-							data = ''
-							break
-					}
+
+					rootSuite = message;
+
 				}
 			});
 
