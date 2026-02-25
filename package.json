@@ -40,7 +40,7 @@
     "escape-string-regexp": "^4.0.0",
     "fs-extra": "^10.1.0",
     "jasmine": "^4.3.0",
-    "minimatch": "^5.1.0",
+    "minimatch": "^5.1.8",
     "stack-trace": "0.0.10",
     "tslib": "^2.4.0",
     "vscode-test-adapter-api": "^1.9.0",
